@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SIM Monitoring Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Operations</p>
+          <h1>SIM & Phone Monitor</h1>
+        </div>
+      </header>
+
+      <p id="appMessage" class="app-message" role="status" hidden></p>
+      <button id="importLocalBtn" class="secondary-btn import-local-btn" type="button" hidden>Import this browser's saved devices</button>
+
+      <section class="stats-grid" id="statsGrid">
+        <article class="stat-card total">
+          <span class="label">Total Phones</span>
+          <strong id="totalPhones">0</strong>
+        </article>
+        <article class="stat-card active">
+          <span class="label">Active SIMs</span>
+          <strong id="activeCount">0</strong>
+        </article>
+        <article class="stat-card inactive">
+          <span class="label">Inactive</span>
+          <strong id="inactiveCount">0</strong>
+        </article>
+        <article class="stat-card offline">
+          <span class="label">Offline</span>
+          <strong id="offlineCount">0</strong>
+        </article>
+      </section>
+
+      <section class="toolbar">
+        <label class="search-field" for="searchInput">
+          <span>Search</span>
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Search"
+            aria-label="Search devices"
+          />
+        </label>
+
+        <label class="filter-field" for="statusFilter">
+          <span>Filter</span>
+          <select id="statusFilter" aria-label="Filter by status">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="offline">Offline</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="add-device-panel">
+        <h2>Add a device</h2>
+        <form id="deviceForm" class="device-form">
+          <div class="field-grid">
+            <label>
+              <span>Device name</span>
+              <input id="deviceNameInput" name="deviceName" type="text" required />
+            </label>
+            <label>
+              <span>Attached PC</span>
+              <input id="attachedPcInput" name="attachedPc" type="text" required />
+            </label>
+            <label>
+              <span>Phone number</span>
+              <input id="phoneNumberInput" name="phoneNumber" type="text" required />
+            </label>
+            <label>
+              <span>Status</span>
+              <select id="statusInput" name="status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="offline">Offline</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="primary-btn">Add device</button>
+        </form>
+      </section>
+
+      <main class="panel">
+        <div class="table-header">
+          <h2>Device Inventory</h2>
+          <span id="resultsCount">0 records</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Attached PC</th>
+                <th>Phone Number</th>
+                <th>Status</th>
+                <th>Last Seen</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="deviceTableBody"></tbody>
+          </table>
+        </div>
+      </main>
+
+      <dialog id="switchSimDialog" class="switch-dialog">
+        <form id="switchSimForm" class="switch-form">
+          <h2>Switch SIM</h2>
+          <p id="switchSourceLabel" class="switch-description"></p>
+          <label id="switchSimIdField" class="device-form-label" for="switchSimIdInput">
+            <span>SIM identifier</span>
+            <input id="switchSimIdInput" name="simIdentifier" type="text" />
+          </label>
+          <label class="filter-field" for="switchTargetInput">
+            <span>Destination phone</span>
+            <select id="switchTargetInput" name="targetId" required></select>
+          </label>
+          <p id="switchNote" class="switch-note"></p>
+          <div class="dialog-actions">
+            <button class="secondary-btn" type="button" id="cancelSwitchBtn">Cancel</button>
+            <button id="confirmSwitchBtn" class="primary-btn" type="submit">Confirm switch</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
