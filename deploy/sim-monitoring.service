@@ -1,0 +1,22 @@
+[Unit]
+Description=SIM Monitoring Dashboard API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=sim-monitor
+Group=sim-monitor
+WorkingDirectory=/opt/sim-monitoring
+EnvironmentFile=/etc/sim-monitoring/app.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

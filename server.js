@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const { Pool } = pg;
 const app = express();
+const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 8000);
 const databaseUrl = process.env.DATABASE_URL;
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -317,8 +318,8 @@ async function initializeDatabase() {
 
 async function start() {
   await initializeDatabase();
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`SIM Monitoring dashboard and API running on http://localhost:${port}`);
+  app.listen(port, host, () => {
+    console.log(`SIM Monitoring dashboard and API listening on http://${host}:${port}`);
   });
 }
 
