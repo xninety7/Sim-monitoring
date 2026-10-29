@@ -195,19 +195,19 @@ h2 {
 }
 
 .stat-card.total {
-  background: rgba(219, 234, 254, 0.72);
+  background: linear-gradient(125deg, rgba(219, 234, 254, 0.72), rgba(255, 255, 255, 0.5) 78%), var(--panel);
 }
 
 .stat-card.active {
-  background: rgba(220, 245, 230, 0.68);
+  background: linear-gradient(125deg, rgba(220, 245, 230, 0.68), rgba(255, 255, 255, 0.5) 78%), var(--panel);
 }
 
 .stat-card.inactive {
-  background: rgba(255, 239, 211, 0.68);
+  background: linear-gradient(125deg, rgba(255, 239, 211, 0.68), rgba(255, 255, 255, 0.5) 78%), var(--panel);
 }
 
 .stat-card.offline {
-  background: rgba(255, 229, 226, 0.62);
+  background: linear-gradient(125deg, rgba(255, 229, 226, 0.62), rgba(255, 255, 255, 0.5) 78%), var(--panel);
 }
 
 .stat-card .label {
@@ -239,6 +239,7 @@ h2 {
   width: min(760px, calc(100% - 32px));
   max-height: calc(100% - 32px);
   overflow-y: auto;
+  background: linear-gradient(135deg, #fff4f8 0%, #fffafd 58%, #ffffff 100%);
 }
 
 .add-device-toggle {
