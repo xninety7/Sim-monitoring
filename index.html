@@ -33,7 +33,7 @@
               </select>
             </label>
           </section>
-          <button id="toggleDeviceFormBtn" class="primary-btn add-device-toggle" type="button" aria-expanded="false" aria-controls="addDevicePanel">Add device</button>
+          <button id="toggleDeviceFormBtn" class="primary-btn add-device-toggle" type="button" aria-haspopup="dialog" aria-controls="addDeviceDialog">Add device</button>
         </div>
       </header>
 
@@ -59,9 +59,9 @@
         </article>
       </section>
 
-      <section id="addDevicePanel" class="add-device-panel" hidden>
-        <h2>Add a device</h2>
-        <form id="deviceForm" class="device-form">
+      <dialog id="addDeviceDialog" class="switch-dialog add-device-dialog">
+        <form id="deviceForm" class="device-form add-device-form">
+          <h2 class="add-device-title">Add a device</h2>
           <div class="field-grid">
             <label>
               <span>Device name</span>
@@ -93,9 +93,12 @@
               </select>
             </label>
           </div>
-          <button type="submit" class="primary-btn">Save device</button>
+          <div class="dialog-actions add-device-actions">
+            <button id="cancelAddDeviceBtn" type="button" class="secondary-btn">Cancel</button>
+            <button type="submit" class="primary-btn save-device-btn">Save device</button>
+          </div>
         </form>
-      </section>
+      </dialog>
 
       <main class="panel">
         <div class="table-header">
@@ -120,6 +123,11 @@
             <tbody id="deviceTableBody"></tbody>
           </table>
         </div>
+        <nav id="pagination" class="pagination" aria-label="Device inventory pages" hidden>
+          <button id="previousPageBtn" class="secondary-btn pagination-btn" type="button">Previous</button>
+          <span id="pageInfo" aria-live="polite"></span>
+          <button id="nextPageBtn" class="secondary-btn pagination-btn" type="button">Next</button>
+        </nav>
       </main>
 
       <dialog id="editDeviceDialog" class="switch-dialog">

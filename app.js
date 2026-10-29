@@ -4,8 +4,15 @@ const searchInput = document.getElementById('searchInput');
 const statusFilter = document.getElementById('statusFilter');
 const tableBody = document.getElementById('deviceTableBody');
 const resultsCount = document.getElementById('resultsCount');
+const pagination = document.getElementById('pagination');
+const previousPageBtn = document.getElementById('previousPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const pageInfo = document.getElementById('pageInfo');
+const pageSize = 10;
+let currentPage = 1;
 const deviceForm = document.getElementById('deviceForm');
-const addDevicePanel = document.getElementById('addDevicePanel');
+const addDeviceDialog = document.getElementById('addDeviceDialog');
+const cancelAddDeviceBtn = document.getElementById('cancelAddDeviceBtn');
 const toggleDeviceFormBtn = document.getElementById('toggleDeviceFormBtn');
 const editDeviceDialog = document.getElementById('editDeviceDialog');
 const editDeviceForm = document.getElementById('editDeviceForm');
@@ -32,12 +39,8 @@ const countEls = {
 const appMessage = document.getElementById('appMessage');
 const importLocalBtn = document.getElementById('importLocalBtn');
 
-toggleDeviceFormBtn.addEventListener('click', () => {
-  const isExpanded = toggleDeviceFormBtn.getAttribute('aria-expanded') === 'true';
-  toggleDeviceFormBtn.setAttribute('aria-expanded', String(!isExpanded));
-  toggleDeviceFormBtn.textContent = isExpanded ? 'Add device' : 'Cancel';
-  addDevicePanel.hidden = isExpanded;
-});
+toggleDeviceFormBtn.addEventListener('click', () => addDeviceDialog.showModal());
+cancelAddDeviceBtn.addEventListener('click', () => addDeviceDialog.close());
 
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, {
@@ -129,8 +132,15 @@ function getFilteredDevices() {
 
 function renderTable() {
   const filtered = getFilteredDevices();
+  const pageCount = Math.ceil(filtered.length / pageSize);
+  currentPage = Math.min(currentPage, Math.max(pageCount, 1));
   resultsCount.textContent = `${filtered.length} records`;
   renderSummary(filtered);
+
+  pagination.hidden = pageCount <= 1;
+  pageInfo.textContent = `Page ${currentPage} of ${Math.max(pageCount, 1)}`;
+  previousPageBtn.disabled = currentPage <= 1;
+  nextPageBtn.disabled = currentPage >= pageCount;
 
   if (!filtered.length) {
     tableBody.innerHTML = `
@@ -141,7 +151,8 @@ function renderTable() {
     return;
   }
 
-  tableBody.innerHTML = filtered
+  const pageDevices = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  tableBody.innerHTML = pageDevices
     .map((device) => `
       <tr>
         <td>
@@ -183,8 +194,29 @@ function escapeHtml(value) {
   })[character]);
 }
 
-searchInput.addEventListener('input', renderTable);
-statusFilter.addEventListener('change', renderTable);
+searchInput.addEventListener('input', () => {
+  currentPage = 1;
+  renderTable();
+});
+statusFilter.addEventListener('change', () => {
+  currentPage = 1;
+  renderTable();
+});
+
+previousPageBtn.addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    renderTable();
+  }
+});
+
+nextPageBtn.addEventListener('click', () => {
+  const pageCount = Math.ceil(getFilteredDevices().length / pageSize);
+  if (currentPage < pageCount) {
+    currentPage += 1;
+    renderTable();
+  }
+});
 
 deviceForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -203,9 +235,7 @@ deviceForm.addEventListener('submit', async (event) => {
   try {
     await apiRequest('/api/devices', { method: 'POST', body: JSON.stringify(newDevice) });
     deviceForm.reset();
-    addDevicePanel.hidden = true;
-    toggleDeviceFormBtn.setAttribute('aria-expanded', 'false');
-    toggleDeviceFormBtn.textContent = 'Add device';
+    addDeviceDialog.close();
     await loadDevices();
     showMessage('Device added to the shared inventory.');
   } catch (error) {
