@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS devices (
     phone_number TEXT NOT NULL CHECK (length(trim(phone_number)) > 0),
     anydesk_id TEXT,
     color TEXT,
+    telco_provider TEXT,
     status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'offline', 'suspended')),
     last_seen TEXT NOT NULL DEFAULT '',
     sim_number TEXT UNIQUE,
@@ -16,6 +17,7 @@ CREATE TABLE IF NOT EXISTS devices (
 
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS anydesk_id TEXT;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS color TEXT;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS telco_provider TEXT;
 
 CREATE INDEX IF NOT EXISTS devices_status_idx ON devices (status);
 CREATE INDEX IF NOT EXISTS devices_name_idx ON devices (device_name);

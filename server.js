@@ -32,6 +32,7 @@ const deviceFields = {
   phoneNumber: 'phone_number',
   anydeskId: 'anydesk_id',
   color: 'color',
+  telcoProvider: 'telco_provider',
   status: 'status',
   lastSeen: 'last_seen',
   simNumber: 'sim_number',
@@ -51,6 +52,7 @@ function toDevice(row) {
     phoneNumber: row.phone_number,
     anydeskId: row.anydesk_id,
     color: row.color,
+    telcoProvider: row.telco_provider,
     status: row.status,
     lastSeen: row.last_seen,
     ...(row.sim_number ? { simNumber: row.sim_number } : {}),
@@ -80,7 +82,7 @@ function validateDevice(input, { requireAll = true } = {}) {
     return 'lastSeen must be a string.';
   }
 
-  for (const field of ['anydeskId', 'color', 'simNumber', 'iccid', 'imei']) {
+  for (const field of ['anydeskId', 'color', 'telcoProvider', 'simNumber', 'iccid', 'imei']) {
     if (input[field] !== undefined && input[field] !== null && typeof input[field] !== 'string') {
       return `${field} must be a string or null.`;
     }
@@ -109,7 +111,7 @@ app.get('/api/health', async (_req, res) => {
 app.get('/api/devices', async (_req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, device_name, attached_pc, phone_number, anydesk_id, color, status, last_seen,
+      SELECT id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen,
              sim_number, iccid, imei
       FROM devices
       ORDER BY id
@@ -143,14 +145,15 @@ app.post('/api/devices/import', async (req, res) => {
     for (const device of devices) {
       await client.query(
         `INSERT INTO devices
-           (device_name, attached_pc, phone_number, anydesk_id, color, status, last_seen, sim_number, iccid, imei)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+           (device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           device.deviceName.trim(),
           device.attachedPc.trim(),
           device.phoneNumber.trim(),
           device.anydeskId?.trim() || null,
           device.color?.trim() || null,
+          device.telcoProvider?.trim() || null,
           device.status || 'inactive',
           device.lastSeen || '',
           device.simNumber || null,
@@ -175,13 +178,13 @@ app.post('/api/devices', async (req, res) => {
   if (validationError) return res.status(400).json({ error: validationError });
 
   try {
-    const { deviceName, attachedPc, phoneNumber, anydeskId, color, status, lastSeen, simNumber, iccid, imei } = req.body;
+    const { deviceName, attachedPc, phoneNumber, anydeskId, color, telcoProvider, status, lastSeen, simNumber, iccid, imei } = req.body;
     const result = await pool.query(
       `INSERT INTO devices
-         (device_name, attached_pc, phone_number, anydesk_id, color, status, last_seen, sim_number, iccid, imei)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, status, last_seen, sim_number, iccid, imei`,
-      [deviceName.trim(), attachedPc.trim(), phoneNumber.trim(), anydeskId?.trim() || null, color?.trim() || null, status || 'inactive', lastSeen || '', simNumber || null, iccid || null, imei || null],
+         (device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei`,
+      [deviceName.trim(), attachedPc.trim(), phoneNumber.trim(), anydeskId?.trim() || null, color?.trim() || null, telcoProvider?.trim() || null, status || 'inactive', lastSeen || '', simNumber || null, iccid || null, imei || null],
     );
     res.status(201).json(toDevice(result.rows[0]));
   } catch (error) {
@@ -212,7 +215,7 @@ app.patch('/api/devices/:id', async (req, res) => {
     const result = await pool.query(
       `UPDATE devices SET ${assignments.join(', ')}, updated_at = now()
        WHERE id = $${keys.length + 1}
-      RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, status, last_seen, sim_number, iccid, imei`,
+      RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei`,
       [...values, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: 'Device not found.' });

@@ -75,7 +75,7 @@ async function loadDevices() {
     importLocalBtn.hidden = true;
     showMessage(`Could not load shared devices: ${error.message}`, true);
     resultsCount.textContent = 'Database unavailable';
-    tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
   }
 }
 
@@ -120,6 +120,7 @@ function getFilteredDevices() {
       device.phoneNumber,
       device.anydeskId,
       device.color,
+      device.telcoProvider,
       device.simNumber,
       device.iccid,
       device.imei,
@@ -145,7 +146,7 @@ function renderTable() {
   if (!filtered.length) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="8" class="empty-state">No matching devices found.</td>
+        <td colspan="9" class="empty-state">No matching devices found.</td>
       </tr>
     `;
     return;
@@ -166,6 +167,7 @@ function renderTable() {
         <td>${escapeHtml(device.phoneNumber)}</td>
         <td>${escapeHtml(device.anydeskId || '—')}</td>
         <td>${escapeHtml(device.color || '—')}</td>
+        <td>${escapeHtml(device.telcoProvider || '—')}</td>
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
         </td>
@@ -228,6 +230,7 @@ deviceForm.addEventListener('submit', async (event) => {
     phoneNumber: String(formData.get('phoneNumber')).trim(),
     anydeskId: String(formData.get('anydeskId') || '').trim(),
     color: String(formData.get('color') || '').trim(),
+    telcoProvider: String(formData.get('telcoProvider') || '').trim(),
     status: String(formData.get('status')) || 'active',
     lastSeen: '',
   };
@@ -273,7 +276,7 @@ function openEditDialog(deviceId) {
   if (!device) return;
 
   editDeviceId = deviceId;
-  for (const field of ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'status', 'lastSeen']) {
+  for (const field of ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'telcoProvider', 'status', 'lastSeen']) {
     editDeviceForm.elements[field].value = device[field] || (field === 'status' ? 'active' : '');
   }
   editDeviceDialog.showModal();
@@ -287,7 +290,7 @@ editDeviceForm.addEventListener('submit', async (event) => {
 
   const formData = new FormData(editDeviceForm);
   const updates = Object.fromEntries(
-    ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'status', 'lastSeen']
+    ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'telcoProvider', 'status', 'lastSeen']
       .map((field) => [field, String(formData.get(field) || '').trim()]),
   );
 
