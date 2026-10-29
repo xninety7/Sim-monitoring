@@ -40,7 +40,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 28px;
   margin-bottom: 20px;
 }
 
@@ -196,14 +196,11 @@ h2 {
 }
 
 .toolbar {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 18px 20px;
+  flex: 0 1 540px;
   display: grid;
-  grid-template-columns: minmax(220px, 360px) minmax(160px, 220px);
-  gap: 16px;
-  margin-bottom: 22px;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.62fr);
+  gap: 12px;
+  margin: 0;
 }
 
 .add-device-panel {
@@ -428,16 +425,29 @@ tbody tr:hover {
 }
 
 @media (max-width: 860px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
   }
 
   .toolbar {
-    grid-template-columns: 1fr;
+    flex: none;
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
 
   .search-field,
   .filter-field {
     max-width: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .toolbar {
+    grid-template-columns: 1fr;
   }
 }
