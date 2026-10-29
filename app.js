@@ -53,7 +53,7 @@ async function loadDevices() {
     renderTable();
     const hasLocalRecords = Boolean(localStorage.getItem('sim-monitoring-devices'));
     importLocalBtn.hidden = allDevices.length > 0 || !hasLocalRecords;
-    if (importLocalBtn.hidden) showMessage('Connected to the shared device database.');
+    if (importLocalBtn.hidden) showMessage('');
     else showMessage('The shared database is empty. You can import this browser’s saved devices once.');
   } catch (error) {
     importLocalBtn.hidden = true;
