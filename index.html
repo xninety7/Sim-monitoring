@@ -122,6 +122,51 @@
         </div>
       </main>
 
+      <dialog id="editDeviceDialog" class="switch-dialog">
+        <form id="editDeviceForm" class="switch-form">
+          <h2>Edit device</h2>
+          <div class="field-grid">
+            <label class="device-form-label">
+              <span>Device name</span>
+              <input name="deviceName" type="text" required />
+            </label>
+            <label class="device-form-label">
+              <span>Attached PC</span>
+              <input name="attachedPc" type="text" required />
+            </label>
+            <label class="device-form-label">
+              <span>Phone number</span>
+              <input name="phoneNumber" type="text" required />
+            </label>
+            <label class="device-form-label">
+              <span>AnyDesk ID</span>
+              <input name="anydeskId" type="text" />
+            </label>
+            <label class="device-form-label">
+              <span>Color</span>
+              <input name="color" type="text" />
+            </label>
+            <label class="device-form-label">
+              <span>Status</span>
+              <select name="status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="offline">Offline</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </label>
+            <label class="device-form-label">
+              <span>Last seen</span>
+              <input name="lastSeen" type="text" />
+            </label>
+          </div>
+          <div class="dialog-actions">
+            <button class="secondary-btn" type="button" id="cancelEditDeviceBtn">Cancel</button>
+            <button class="primary-btn" type="submit">Save changes</button>
+          </div>
+        </form>
+      </dialog>
+
       <dialog id="switchSimDialog" class="switch-dialog">
         <form id="switchSimForm" class="switch-form">
           <h2>Switch SIM</h2>

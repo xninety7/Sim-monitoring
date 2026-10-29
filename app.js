@@ -5,6 +5,9 @@ const statusFilter = document.getElementById('statusFilter');
 const tableBody = document.getElementById('deviceTableBody');
 const resultsCount = document.getElementById('resultsCount');
 const deviceForm = document.getElementById('deviceForm');
+const editDeviceDialog = document.getElementById('editDeviceDialog');
+const editDeviceForm = document.getElementById('editDeviceForm');
+const cancelEditDeviceBtn = document.getElementById('cancelEditDeviceBtn');
 const switchSimDialog = document.getElementById('switchSimDialog');
 const switchSimForm = document.getElementById('switchSimForm');
 const switchTargetInput = document.getElementById('switchTargetInput');
@@ -15,6 +18,7 @@ const switchNote = document.getElementById('switchNote');
 const confirmSwitchBtn = document.getElementById('confirmSwitchBtn');
 const cancelSwitchBtn = document.getElementById('cancelSwitchBtn');
 let switchSourceId = null;
+let editDeviceId = null;
 
 const countEls = {
   total: document.getElementById('totalPhones'),
@@ -140,20 +144,15 @@ function renderTable() {
         </td>
         <td>${escapeHtml(device.attachedPc)}</td>
         <td>${escapeHtml(device.phoneNumber)}</td>
-        <td>
-          <input class="device-text-input" data-field="anydeskId" data-id="${device.id}" type="text" value="${escapeHtml(device.anydeskId || '')}" aria-label="AnyDesk ID for ${escapeHtml(device.deviceName)}" placeholder="Not set" />
-        </td>
-        <td>
-          <input class="device-text-input" data-field="color" data-id="${device.id}" type="text" value="${escapeHtml(device.color || '')}" aria-label="Color for ${escapeHtml(device.deviceName)}" placeholder="Not set" />
-        </td>
+        <td>${escapeHtml(device.anydeskId || '—')}</td>
+        <td>${escapeHtml(device.color || '—')}</td>
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
         </td>
-        <td>
-          <input class="last-seen-input" data-id="${device.id}" type="text" value="${escapeHtml(device.lastSeen)}" aria-label="Last seen for ${escapeHtml(device.deviceName)}" />
-        </td>
+        <td>${escapeHtml(device.lastSeen || '—')}</td>
         <td>
           <button class="switch-btn" data-id="${device.id}" type="button">Switch SIM</button>
+          <button class="edit-btn" data-id="${device.id}" type="button">Edit</button>
           <button class="delete-btn" data-id="${device.id}" type="button">Delete</button>
         </td>
       </tr>
@@ -203,6 +202,12 @@ deviceForm.addEventListener('submit', async (event) => {
 });
 
 tableBody.addEventListener('click', async (event) => {
+  const editButton = event.target.closest('.edit-btn');
+  if (editButton) {
+    openEditDialog(Number(editButton.dataset.id));
+    return;
+  }
+
   const switchButton = event.target.closest('.switch-btn');
   if (switchButton) {
     openSwitchDialog(Number(switchButton.dataset.id));
@@ -216,6 +221,43 @@ tableBody.addEventListener('click', async (event) => {
     await apiRequest(`/api/devices/${button.dataset.id}`, { method: 'DELETE' });
     await loadDevices();
     showMessage('Device deleted from the shared inventory.');
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+});
+
+function openEditDialog(deviceId) {
+  const device = allDevices.find((item) => item.id === deviceId);
+  if (!device) return;
+
+  editDeviceId = deviceId;
+  for (const field of ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'status', 'lastSeen']) {
+    editDeviceForm.elements[field].value = device[field] || (field === 'status' ? 'active' : '');
+  }
+  editDeviceDialog.showModal();
+}
+
+cancelEditDeviceBtn.addEventListener('click', () => editDeviceDialog.close());
+
+editDeviceForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (editDeviceId === null) return;
+
+  const formData = new FormData(editDeviceForm);
+  const updates = Object.fromEntries(
+    ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'status', 'lastSeen']
+      .map((field) => [field, String(formData.get(field) || '').trim()]),
+  );
+
+  try {
+    await apiRequest(`/api/devices/${editDeviceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    editDeviceDialog.close();
+    editDeviceId = null;
+    await loadDevices();
+    showMessage('Device updated in the shared inventory.');
   } catch (error) {
     showMessage(error.message, true);
   }
@@ -277,29 +319,6 @@ switchSimForm.addEventListener('submit', async (event) => {
     await loadDevices();
     showMessage(`SIM assignment updated for ${source.deviceName} and ${target.deviceName}.`);
   } catch (error) {
-    showMessage(error.message, true);
-  }
-});
-
-tableBody.addEventListener('change', async (event) => {
-  const input = event.target.closest('.last-seen-input, .device-text-input');
-  if (!input) return;
-
-  const device = allDevices.find((item) => item.id === Number(input.dataset.id));
-  if (!device) return;
-
-  const field = input.dataset.field || 'lastSeen';
-
-  try {
-    const updated = await apiRequest(`/api/devices/${device.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ [field]: input.value.trim() }),
-    });
-    Object.assign(device, updated);
-    const fieldLabel = { anydeskId: 'AnyDesk ID', color: 'Color', lastSeen: 'Last Seen' }[field];
-    showMessage(`${fieldLabel} saved to the shared database.`);
-  } catch (error) {
-    input.value = device[field] || '';
     showMessage(error.message, true);
   }
 });

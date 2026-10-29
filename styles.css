@@ -142,6 +142,22 @@ h2 {
   margin-right: 6px;
 }
 
+.edit-btn {
+  border: 1px solid rgba(29, 155, 240, 0.24);
+  background: #edf7ff;
+  color: #1268a5;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.edit-btn:hover {
+  background: #dff1ff;
+}
+
 .switch-btn:hover:not(:disabled) {
   background: #dff1ff;
 }
@@ -250,24 +266,6 @@ h2 {
   color: rgba(82, 98, 122, 0.8);
 }
 
-.last-seen-input,
-.device-text-input {
-  width: 170px;
-  max-width: 100%;
-  padding: 8px 10px;
-  color: var(--text);
-  background: #fff;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 8px;
-  font: inherit;
-}
-
-.last-seen-input:focus,
-.device-text-input:focus {
-  outline: 2px solid rgba(29, 155, 240, 0.25);
-  border-color: var(--accent);
-}
-
 .switch-dialog {
   width: min(480px, calc(100% - 32px));
   padding: 0;
@@ -301,6 +299,16 @@ h2 {
 }
 
 .device-form-label input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  color: var(--text);
+  background: #fff;
+  font: inherit;
+}
+
+.device-form-label select {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid rgba(148, 163, 184, 0.3);
