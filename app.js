@@ -5,6 +5,7 @@ const statusFilter = document.getElementById('statusFilter');
 const tableBody = document.getElementById('deviceTableBody');
 const resultsCount = document.getElementById('resultsCount');
 const deviceForm = document.getElementById('deviceForm');
+const addDevicePanel = document.getElementById('addDevicePanel');
 const toggleDeviceFormBtn = document.getElementById('toggleDeviceFormBtn');
 const editDeviceDialog = document.getElementById('editDeviceDialog');
 const editDeviceForm = document.getElementById('editDeviceForm');
@@ -35,7 +36,7 @@ toggleDeviceFormBtn.addEventListener('click', () => {
   const isExpanded = toggleDeviceFormBtn.getAttribute('aria-expanded') === 'true';
   toggleDeviceFormBtn.setAttribute('aria-expanded', String(!isExpanded));
   toggleDeviceFormBtn.textContent = isExpanded ? 'Add device' : 'Cancel';
-  deviceForm.hidden = isExpanded;
+  addDevicePanel.hidden = isExpanded;
 });
 
 async function apiRequest(url, options = {}) {
@@ -202,7 +203,7 @@ deviceForm.addEventListener('submit', async (event) => {
   try {
     await apiRequest('/api/devices', { method: 'POST', body: JSON.stringify(newDevice) });
     deviceForm.reset();
-    deviceForm.hidden = true;
+    addDevicePanel.hidden = true;
     toggleDeviceFormBtn.setAttribute('aria-expanded', 'false');
     toggleDeviceFormBtn.textContent = 'Add device';
     await loadDevices();

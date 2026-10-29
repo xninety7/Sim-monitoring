@@ -38,10 +38,22 @@ body {
 
 .topbar {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  gap: 28px;
+  gap: 14px;
   margin-bottom: 20px;
+}
+
+.dashboard-title {
+  text-align: center;
+}
+
+.header-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 .app-message {
@@ -216,22 +228,15 @@ h2 {
   margin: 0;
 }
 
-.add-device-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+.add-device-panel[hidden] {
+  display: none;
 }
 
 .add-device-toggle {
   white-space: nowrap;
 }
 
-.device-form[hidden] {
-  display: none;
-}
-
-.device-form:not([hidden]) {
+.device-form {
   margin-top: 16px;
 }
 
@@ -444,17 +449,6 @@ tbody tr:hover {
 }
 
 @media (max-width: 860px) {
-  .topbar {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .toolbar {
-    flex: none;
-    width: 100%;
-  }
-
   .stats-grid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
@@ -466,7 +460,16 @@ tbody tr:hover {
 }
 
 @media (max-width: 520px) {
+  .header-controls {
+    flex-wrap: wrap;
+  }
+
   .toolbar {
-    grid-template-columns: 1fr;
+    flex: 1 1 100%;
+    grid-template-columns: 1fr 0.8fr;
+  }
+
+  .add-device-toggle {
+    flex: 0 0 auto;
   }
 }

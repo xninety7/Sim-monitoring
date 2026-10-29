@@ -9,29 +9,32 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
+        <div class="dashboard-title">
           <h1>SIM & Phone Monitor</h1>
         </div>
-        <section class="toolbar" aria-label="Search and filter devices">
-          <label class="search-field" for="searchInput">
-            <input
-              id="searchInput"
-              type="search"
-              placeholder="Search"
-              aria-label="Search devices"
-            />
-          </label>
+        <div class="header-controls">
+          <section class="toolbar" aria-label="Search and filter devices">
+            <label class="search-field" for="searchInput">
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="Search"
+                aria-label="Search devices"
+              />
+            </label>
 
-          <label class="filter-field" for="statusFilter">
-            <select id="statusFilter" aria-label="Filter by status">
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="offline">Offline</option>
-              <option value="suspended">Suspended</option>
-            </select>
-          </label>
-        </section>
+            <label class="filter-field" for="statusFilter">
+              <select id="statusFilter" aria-label="Filter by status">
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="offline">Offline</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </label>
+          </section>
+          <button id="toggleDeviceFormBtn" class="primary-btn add-device-toggle" type="button" aria-expanded="false" aria-controls="addDevicePanel">Add device</button>
+        </div>
       </header>
 
       <p id="appMessage" class="app-message" role="status" hidden></p>
@@ -56,12 +59,9 @@
         </article>
       </section>
 
-      <section class="add-device-panel">
-        <div class="add-device-header">
-          <h2>Add a device</h2>
-          <button id="toggleDeviceFormBtn" class="secondary-btn add-device-toggle" type="button" aria-expanded="false" aria-controls="deviceForm">Add device</button>
-        </div>
-        <form id="deviceForm" class="device-form" hidden>
+      <section id="addDevicePanel" class="add-device-panel" hidden>
+        <h2>Add a device</h2>
+        <form id="deviceForm" class="device-form">
           <div class="field-grid">
             <label>
               <span>Device name</span>
