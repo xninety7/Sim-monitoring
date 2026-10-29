@@ -179,11 +179,6 @@ h2 {
   letter-spacing: -0.06em;
 }
 
-.stat-card.total { border-top: 3px solid var(--accent); }
-.stat-card.active { border-top: 3px solid var(--active); }
-.stat-card.inactive { border-top: 3px solid var(--inactive); }
-.stat-card.offline { border-top: 3px solid var(--offline); }
-
 .toolbar {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid var(--line);
@@ -255,7 +250,8 @@ h2 {
   color: rgba(82, 98, 122, 0.8);
 }
 
-.last-seen-input {
+.last-seen-input,
+.device-text-input {
   width: 170px;
   max-width: 100%;
   padding: 8px 10px;
@@ -266,7 +262,8 @@ h2 {
   font: inherit;
 }
 
-.last-seen-input:focus {
+.last-seen-input:focus,
+.device-text-input:focus {
   outline: 2px solid rgba(29, 155, 240, 0.25);
   border-color: var(--accent);
 }

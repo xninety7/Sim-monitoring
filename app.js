@@ -59,7 +59,7 @@ async function loadDevices() {
     importLocalBtn.hidden = true;
     showMessage(`Could not load shared devices: ${error.message}`, true);
     resultsCount.textContent = 'Database unavailable';
-    tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="8" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
   }
 }
 
@@ -102,6 +102,8 @@ function getFilteredDevices() {
       device.deviceName,
       device.attachedPc,
       device.phoneNumber,
+      device.anydeskId,
+      device.color,
       device.simNumber,
       device.iccid,
       device.imei,
@@ -120,7 +122,7 @@ function renderTable() {
   if (!filtered.length) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6" class="empty-state">No matching devices found.</td>
+        <td colspan="8" class="empty-state">No matching devices found.</td>
       </tr>
     `;
     return;
@@ -138,6 +140,12 @@ function renderTable() {
         </td>
         <td>${escapeHtml(device.attachedPc)}</td>
         <td>${escapeHtml(device.phoneNumber)}</td>
+        <td>
+          <input class="device-text-input" data-field="anydeskId" data-id="${device.id}" type="text" value="${escapeHtml(device.anydeskId || '')}" aria-label="AnyDesk ID for ${escapeHtml(device.deviceName)}" placeholder="Not set" />
+        </td>
+        <td>
+          <input class="device-text-input" data-field="color" data-id="${device.id}" type="text" value="${escapeHtml(device.color || '')}" aria-label="Color for ${escapeHtml(device.deviceName)}" placeholder="Not set" />
+        </td>
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
         </td>
@@ -178,6 +186,8 @@ deviceForm.addEventListener('submit', async (event) => {
     deviceName: String(formData.get('deviceName')).trim(),
     attachedPc: String(formData.get('attachedPc')).trim(),
     phoneNumber: String(formData.get('phoneNumber')).trim(),
+    anydeskId: String(formData.get('anydeskId') || '').trim(),
+    color: String(formData.get('color') || '').trim(),
     status: String(formData.get('status')) || 'active',
     lastSeen: '',
   };
@@ -272,21 +282,24 @@ switchSimForm.addEventListener('submit', async (event) => {
 });
 
 tableBody.addEventListener('change', async (event) => {
-  const input = event.target.closest('.last-seen-input');
+  const input = event.target.closest('.last-seen-input, .device-text-input');
   if (!input) return;
 
   const device = allDevices.find((item) => item.id === Number(input.dataset.id));
   if (!device) return;
 
+  const field = input.dataset.field || 'lastSeen';
+
   try {
     const updated = await apiRequest(`/api/devices/${device.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ lastSeen: input.value.trim() }),
+      body: JSON.stringify({ [field]: input.value.trim() }),
     });
     Object.assign(device, updated);
-    showMessage('Last Seen saved to the shared database.');
+    const fieldLabel = { anydeskId: 'AnyDesk ID', color: 'Color', lastSeen: 'Last Seen' }[field];
+    showMessage(`${fieldLabel} saved to the shared database.`);
   } catch (error) {
-    input.value = device.lastSeen;
+    input.value = device[field] || '';
     showMessage(error.message, true);
   }
 });
