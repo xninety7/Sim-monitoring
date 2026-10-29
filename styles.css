@@ -239,7 +239,7 @@ h2 {
   width: min(760px, calc(100% - 32px));
   max-height: calc(100% - 32px);
   overflow-y: auto;
-  background: linear-gradient(135deg, #fff4f8 0%, #fffafd 58%, #ffffff 100%);
+  background: linear-gradient(135deg, #fff9e8 0%, #fffdf6 58%, #ffffff 100%);
 }
 
 .add-device-toggle {
