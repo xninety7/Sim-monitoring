@@ -213,7 +213,26 @@ h2 {
 }
 
 .add-device-panel h2 {
-  margin: 0 0 14px;
+  margin: 0;
+}
+
+.add-device-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.add-device-toggle {
+  white-space: nowrap;
+}
+
+.device-form[hidden] {
+  display: none;
+}
+
+.device-form:not([hidden]) {
+  margin-top: 16px;
 }
 
 .device-form {

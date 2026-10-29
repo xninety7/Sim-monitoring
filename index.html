@@ -57,8 +57,11 @@
       </section>
 
       <section class="add-device-panel">
-        <h2>Add a device</h2>
-        <form id="deviceForm" class="device-form">
+        <div class="add-device-header">
+          <h2>Add a device</h2>
+          <button id="toggleDeviceFormBtn" class="secondary-btn add-device-toggle" type="button" aria-expanded="false" aria-controls="deviceForm">Add device</button>
+        </div>
+        <form id="deviceForm" class="device-form" hidden>
           <div class="field-grid">
             <label>
               <span>Device name</span>
@@ -90,7 +93,7 @@
               </select>
             </label>
           </div>
-          <button type="submit" class="primary-btn">Add device</button>
+          <button type="submit" class="primary-btn">Save device</button>
         </form>
       </section>
 

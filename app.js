@@ -5,6 +5,7 @@ const statusFilter = document.getElementById('statusFilter');
 const tableBody = document.getElementById('deviceTableBody');
 const resultsCount = document.getElementById('resultsCount');
 const deviceForm = document.getElementById('deviceForm');
+const toggleDeviceFormBtn = document.getElementById('toggleDeviceFormBtn');
 const editDeviceDialog = document.getElementById('editDeviceDialog');
 const editDeviceForm = document.getElementById('editDeviceForm');
 const cancelEditDeviceBtn = document.getElementById('cancelEditDeviceBtn');
@@ -29,6 +30,13 @@ const countEls = {
 
 const appMessage = document.getElementById('appMessage');
 const importLocalBtn = document.getElementById('importLocalBtn');
+
+toggleDeviceFormBtn.addEventListener('click', () => {
+  const isExpanded = toggleDeviceFormBtn.getAttribute('aria-expanded') === 'true';
+  toggleDeviceFormBtn.setAttribute('aria-expanded', String(!isExpanded));
+  toggleDeviceFormBtn.textContent = isExpanded ? 'Add device' : 'Cancel';
+  deviceForm.hidden = isExpanded;
+});
 
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, {
@@ -194,6 +202,9 @@ deviceForm.addEventListener('submit', async (event) => {
   try {
     await apiRequest('/api/devices', { method: 'POST', body: JSON.stringify(newDevice) });
     deviceForm.reset();
+    deviceForm.hidden = true;
+    toggleDeviceFormBtn.setAttribute('aria-expanded', 'false');
+    toggleDeviceFormBtn.textContent = 'Add device';
     await loadDevices();
     showMessage('Device added to the shared inventory.');
   } catch (error) {
