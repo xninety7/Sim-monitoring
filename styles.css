@@ -187,11 +187,27 @@ h2 {
 }
 
 .stat-card {
-  background: linear-gradient(125deg, rgba(226, 240, 255, 0.18), rgba(255, 255, 255, 0) 58%), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 18px 20px;
   box-shadow: var(--shadow);
+}
+
+.stat-card.total {
+  background: linear-gradient(125deg, rgba(219, 234, 254, 0.72), rgba(255, 255, 255, 0.5) 78%), var(--panel);
+}
+
+.stat-card.active {
+  background: linear-gradient(125deg, rgba(220, 245, 230, 0.68), rgba(255, 255, 255, 0.5) 78%), var(--panel);
+}
+
+.stat-card.inactive {
+  background: linear-gradient(125deg, rgba(255, 239, 211, 0.68), rgba(255, 255, 255, 0.5) 78%), var(--panel);
+}
+
+.stat-card.offline {
+  background: linear-gradient(125deg, rgba(255, 229, 226, 0.62), rgba(255, 255, 255, 0.5) 78%), var(--panel);
 }
 
 .stat-card .label {
