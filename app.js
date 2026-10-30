@@ -4,6 +4,7 @@ const searchInput = document.getElementById('searchInput');
 const statusFilter = document.getElementById('statusFilter');
 const tableBody = document.getElementById('deviceTableBody');
 const resultsCount = document.getElementById('resultsCount');
+const activityList = document.getElementById('activityList');
 const pagination = document.getElementById('pagination');
 const previousPageBtn = document.getElementById('previousPageBtn');
 const nextPageBtn = document.getElementById('nextPageBtn');
@@ -67,6 +68,7 @@ async function loadDevices() {
   try {
     allDevices = await apiRequest('/api/devices');
     renderTable();
+    await loadActivity();
     const hasLocalRecords = Boolean(localStorage.getItem('sim-monitoring-devices'));
     importLocalBtn.hidden = allDevices.length > 0 || !hasLocalRecords;
     if (importLocalBtn.hidden) showMessage('');
@@ -76,6 +78,26 @@ async function loadDevices() {
     showMessage(`Could not load shared devices: ${error.message}`, true);
     resultsCount.textContent = 'Database unavailable';
     tableBody.innerHTML = '<tr><td colspan="9" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
+  }
+}
+
+async function loadActivity() {
+  try {
+    const events = await apiRequest('/api/activity');
+    activityList.innerHTML = events.length
+      ? events.slice(0, 10).map((event) => `
+          <li class="activity-item">
+            <div class="activity-summary">
+              <strong>${escapeHtml(event.actor)}</strong>
+              <span>${escapeHtml(event.action)}</span>
+              <span>${escapeHtml(event.details)}</span>
+            </div>
+            <time datetime="${escapeHtml(event.createdAt)}">${escapeHtml(new Date(event.createdAt).toLocaleString())}</time>
+          </li>
+        `).join('')
+      : '<li class="activity-empty">No activity recorded yet.</li>';
+  } catch {
+    activityList.innerHTML = '<li class="activity-empty">Activity log is unavailable.</li>';
   }
 }
 
@@ -240,7 +262,7 @@ deviceForm.addEventListener('submit', async (event) => {
     deviceForm.reset();
     addDeviceDialog.close();
     await loadDevices();
-    showMessage('Device added to the shared inventory.');
+    showMessage('Asset added to the shared inventory.');
   } catch (error) {
     showMessage(error.message, true);
   }
@@ -265,7 +287,7 @@ tableBody.addEventListener('click', async (event) => {
   try {
     await apiRequest(`/api/devices/${button.dataset.id}`, { method: 'DELETE' });
     await loadDevices();
-    showMessage('Device deleted from the shared inventory.');
+    showMessage('Asset deleted from the shared inventory.');
   } catch (error) {
     showMessage(error.message, true);
   }
@@ -302,7 +324,7 @@ editDeviceForm.addEventListener('submit', async (event) => {
     editDeviceDialog.close();
     editDeviceId = null;
     await loadDevices();
-    showMessage('Device updated in the shared inventory.');
+    showMessage('Asset updated in the shared inventory.');
   } catch (error) {
     showMessage(error.message, true);
   }

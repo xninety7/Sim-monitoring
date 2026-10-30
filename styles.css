@@ -388,6 +388,54 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.activity-panel {
+  margin-top: 22px;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 22px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-item:last-child {
+  border-bottom: 0;
+}
+
+.activity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-summary strong {
+  color: var(--text);
+}
+
+.activity-summary span,
+.activity-item time,
+.activity-empty {
+  color: var(--muted);
+}
+
+.activity-item time {
+  flex: 0 0 auto;
+  font: 0.82rem/1.4 "Segoe UI", Arial, sans-serif;
+}
+
+.activity-empty {
+  padding: 16px 0;
+}
+
 .table-header {
   display: flex;
   justify-content: space-between;

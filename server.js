@@ -99,10 +99,36 @@ function sendDatabaseError(res, error) {
   return res.status(500).json({ error: 'Database request failed.' });
 }
 
+async function logActivity(req, action, details) {
+  const actor = req.get('X-Authenticated-User')?.trim().slice(0, 100) || 'Unknown user';
+  try {
+    await pool.query(
+      'INSERT INTO activity_log (actor, action, details) VALUES ($1, $2, $3)',
+      [actor, action, details.slice(0, 500)],
+    );
+  } catch (error) {
+    console.error('Could not write activity log:', error.message);
+  }
+}
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', database: 'connected' });
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.get('/api/activity', async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, actor, action, details, created_at AS "createdAt"
+      FROM activity_log
+      ORDER BY id DESC
+      LIMIT 50
+    `);
+    res.json(result.rows);
   } catch (error) {
     sendDatabaseError(res, error);
   }
@@ -164,6 +190,7 @@ app.post('/api/devices/import', async (req, res) => {
     }
 
     await client.query('COMMIT');
+    await logActivity(req, 'Imported devices', `${devices.length} device record${devices.length === 1 ? '' : 's'}`);
     return res.status(201).json({ imported: devices.length });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -186,6 +213,7 @@ app.post('/api/devices', async (req, res) => {
        RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei`,
       [deviceName.trim(), attachedPc.trim(), phoneNumber.trim(), anydeskId?.trim() || null, color?.trim() || null, telcoProvider?.trim() || null, status || 'inactive', lastSeen || '', simNumber || null, iccid || null, imei || null],
     );
+    await logActivity(req, 'Added asset', deviceName.trim());
     res.status(201).json(toDevice(result.rows[0]));
   } catch (error) {
     sendDatabaseError(res, error);
@@ -219,6 +247,8 @@ app.patch('/api/devices/:id', async (req, res) => {
       [...values, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: 'Device not found.' });
+    const deviceName = result.rows[0].device_name;
+    await logActivity(req, 'Updated asset', `Asset code ${deviceName}: ${keys.join(', ')}`);
     res.json(toDevice(result.rows[0]));
   } catch (error) {
     sendDatabaseError(res, error);
@@ -276,6 +306,7 @@ app.post('/api/devices/:id/switch-sim', async (req, res) => {
     );
 
     await client.query('COMMIT');
+    await logActivity(req, 'Switched SIM', `${sourceRow.device_name} ↔ ${targetRow.device_name}`);
     res.json({ switched: true, sourceId, targetId });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -290,8 +321,9 @@ app.delete('/api/devices/:id', async (req, res) => {
   if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid device id.' });
 
   try {
-    const result = await pool.query('DELETE FROM devices WHERE id = $1 RETURNING id', [id]);
+    const result = await pool.query('DELETE FROM devices WHERE id = $1 RETURNING id, device_name', [id]);
     if (!result.rowCount) return res.status(404).json({ error: 'Device not found.' });
+    await logActivity(req, 'Deleted asset', result.rows[0].device_name);
     res.status(204).end();
   } catch (error) {
     sendDatabaseError(res, error);

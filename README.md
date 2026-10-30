@@ -117,6 +117,19 @@ sudo systemctl reload nginx
 
 The application currently has no built-in user accounts or role permissions. The Nginx password gate is only a simple interim protection; do not publish the site without HTTPS and access control.
 
+### Activity log and identifying users
+
+The dashboard records successful device additions, edits, deletions, SIM switches, and imports in PostgreSQL, and displays the ten most recent actions. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
+
+To identify individual teammates, give each person a distinct Basic Auth username. Add users without `-c` so the existing password file is preserved:
+
+```bash
+sudo htpasswd /etc/nginx/sim-monitoring.htpasswd alice
+sudo htpasswd /etc/nginx/sim-monitoring.htpasswd bob
+```
+
+If everyone signs in using the same username, the log cannot distinguish them. Ensure the active Nginx site config sets `proxy_set_header X-Authenticated-User $remote_user;` in the proxied location, then test and reload Nginx. Restart the app after deploying so it creates the activity-log table through the normal schema initialization.
+
 ## API overview
 
 - `GET /api/health` — check API and database connectivity
@@ -126,6 +139,7 @@ The application currently has no built-in user accounts or role permissions. The
 - `DELETE /api/devices/:id` — delete a device
 - `POST /api/devices/:id/switch-sim` — transactionally transfer/swap SIM assignment
 - `POST /api/devices/import` — import records once into an empty database
+- `GET /api/activity` — retrieve the latest activity events
 
 ## Important
 
