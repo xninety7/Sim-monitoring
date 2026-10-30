@@ -34,7 +34,7 @@
             </label>
           </section>
           <button id="toggleDeviceFormBtn" class="primary-btn add-device-toggle" type="button" aria-haspopup="dialog" aria-controls="addDeviceDialog">Add device</button>
-          <button id="toggleActivityBtn" class="secondary-btn activity-toggle" type="button" aria-expanded="false" aria-controls="activityPanel">Recent activity</button>
+          <a class="secondary-btn activity-link" href="activity.html">Recent activity</a>
         </div>
       </header>
 
@@ -135,21 +135,6 @@
           <button id="nextPageBtn" class="secondary-btn pagination-btn" type="button">Next</button>
         </nav>
       </main>
-
-      <section id="activityPanel" class="panel activity-panel" aria-labelledby="activityHeading" hidden>
-        <div class="table-header">
-          <h2 id="activityHeading">Recent activity</h2>
-          <span id="activityCount">0 actions</span>
-        </div>
-        <ol id="activityList" class="activity-list" aria-live="polite">
-          <li class="activity-empty">No activity recorded yet.</li>
-        </ol>
-        <nav id="activityPagination" class="pagination" aria-label="Activity log pages" hidden>
-          <button id="activityPreviousBtn" class="secondary-btn pagination-btn" type="button">Previous</button>
-          <span id="activityPageInfo" aria-live="polite"></span>
-          <button id="activityNextBtn" class="secondary-btn pagination-btn" type="button">Next</button>
-        </nav>
-      </section>
 
       <dialog id="editDeviceDialog" class="switch-dialog">
         <form id="editDeviceForm" class="switch-form">

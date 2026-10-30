@@ -119,7 +119,7 @@ The application currently has no built-in user accounts or role permissions. The
 
 ### Activity log and identifying users
 
-The dashboard records successful device additions, edits, deletions, SIM switches, and imports in PostgreSQL. The Recent activity panel is opened from the header and paginates the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
+The dashboard records successful device additions, edits, deletions, SIM switches, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
 
 To identify individual teammates, give each person a distinct Basic Auth username. Add users without `-c` so the existing password file is preserved:
 

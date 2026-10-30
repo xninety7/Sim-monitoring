@@ -56,8 +56,12 @@ body {
   width: 100%;
 }
 
-.activity-toggle {
+.activity-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .app-message {
@@ -392,12 +396,41 @@ h2 {
   box-shadow: var(--shadow);
 }
 
-.activity-panel {
-  margin-top: 22px;
+.activity-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
-.activity-panel[hidden] {
-  display: none;
+.activity-eyebrow {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font: 800 0.72rem/1.3 "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.activity-page-header h1 {
+  font-size: clamp(2.2rem, 3vw, 3.2rem);
+}
+
+.activity-page-description {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.activity-back-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
+.activity-log-panel {
+  min-height: 180px;
 }
 
 .activity-list {
@@ -573,5 +606,10 @@ tbody tr:hover {
 
   .add-device-toggle {
     flex: 0 0 auto;
+  }
+
+  .activity-page-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

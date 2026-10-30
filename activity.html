@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recent Activity | SIM & Phone Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell activity-page">
+      <header class="activity-page-header">
+        <div>
+          <p class="activity-eyebrow">SIM & Phone Monitor</p>
+          <h1>Recent activity</h1>
+          <p class="activity-page-description">A history of changes made to the shared inventory.</p>
+        </div>
+        <a class="secondary-btn activity-back-link" href="/">Back to inventory</a>
+      </header>
+
+      <main class="panel activity-log-panel" aria-labelledby="activityHeading">
+        <div class="table-header">
+          <h2 id="activityHeading">Activity history</h2>
+          <span id="activityCount">Loading…</span>
+        </div>
+        <ol id="activityList" class="activity-list" aria-live="polite">
+          <li class="activity-empty">Loading activity…</li>
+        </ol>
+        <nav id="activityPagination" class="pagination" aria-label="Activity log pages" hidden>
+          <button id="activityPreviousBtn" class="secondary-btn pagination-btn" type="button">Previous</button>
+          <span id="activityPageInfo" aria-live="polite"></span>
+          <button id="activityNextBtn" class="secondary-btn pagination-btn" type="button">Next</button>
+        </nav>
+      </main>
+    </div>
+    <script src="activity.js"></script>
+  </body>
+</html>
