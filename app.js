@@ -5,12 +5,21 @@ const statusFilter = document.getElementById('statusFilter');
 const tableBody = document.getElementById('deviceTableBody');
 const resultsCount = document.getElementById('resultsCount');
 const activityList = document.getElementById('activityList');
+const activityPanel = document.getElementById('activityPanel');
+const activityCount = document.getElementById('activityCount');
+const activityPagination = document.getElementById('activityPagination');
+const activityPreviousBtn = document.getElementById('activityPreviousBtn');
+const activityNextBtn = document.getElementById('activityNextBtn');
+const activityPageInfo = document.getElementById('activityPageInfo');
+const toggleActivityBtn = document.getElementById('toggleActivityBtn');
 const pagination = document.getElementById('pagination');
 const previousPageBtn = document.getElementById('previousPageBtn');
 const nextPageBtn = document.getElementById('nextPageBtn');
 const pageInfo = document.getElementById('pageInfo');
 const pageSize = 10;
 let currentPage = 1;
+let activityPage = 1;
+let activityPageCount = 1;
 const deviceForm = document.getElementById('deviceForm');
 const addDeviceDialog = document.getElementById('addDeviceDialog');
 const cancelAddDeviceBtn = document.getElementById('cancelAddDeviceBtn');
@@ -42,6 +51,15 @@ const importLocalBtn = document.getElementById('importLocalBtn');
 
 toggleDeviceFormBtn.addEventListener('click', () => addDeviceDialog.showModal());
 cancelAddDeviceBtn.addEventListener('click', () => addDeviceDialog.close());
+toggleActivityBtn.addEventListener('click', async () => {
+  const isExpanded = toggleActivityBtn.getAttribute('aria-expanded') === 'true';
+  toggleActivityBtn.setAttribute('aria-expanded', String(!isExpanded));
+  activityPanel.hidden = isExpanded;
+  if (!isExpanded) {
+    activityPage = 1;
+    await loadActivity();
+  }
+});
 
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, {
@@ -68,7 +86,7 @@ async function loadDevices() {
   try {
     allDevices = await apiRequest('/api/devices');
     renderTable();
-    await loadActivity();
+    if (!activityPanel.hidden) await loadActivity(activityPage);
     const hasLocalRecords = Boolean(localStorage.getItem('sim-monitoring-devices'));
     importLocalBtn.hidden = allDevices.length > 0 || !hasLocalRecords;
     if (importLocalBtn.hidden) showMessage('');
@@ -81,11 +99,18 @@ async function loadDevices() {
   }
 }
 
-async function loadActivity() {
+async function loadActivity(page = 1) {
   try {
-    const events = await apiRequest('/api/activity');
-    activityList.innerHTML = events.length
-      ? events.slice(0, 10).map((event) => `
+    const result = await apiRequest(`/api/activity?page=${page}`);
+    activityPage = result.page;
+    activityPageCount = result.pageCount;
+    activityCount.textContent = `${result.total} action${result.total === 1 ? '' : 's'}`;
+    activityPageInfo.textContent = `Page ${activityPage} of ${activityPageCount}`;
+    activityPagination.hidden = activityPageCount <= 1;
+    activityPreviousBtn.disabled = activityPage <= 1;
+    activityNextBtn.disabled = activityPage >= activityPageCount;
+    activityList.innerHTML = result.events.length
+      ? result.events.map((event) => `
           <li class="activity-item">
             <div class="activity-summary">
               <strong>${escapeHtml(event.actor)}</strong>
@@ -98,6 +123,7 @@ async function loadActivity() {
       : '<li class="activity-empty">No activity recorded yet.</li>';
   } catch {
     activityList.innerHTML = '<li class="activity-empty">Activity log is unavailable.</li>';
+    activityPagination.hidden = true;
   }
 }
 
@@ -240,6 +266,14 @@ nextPageBtn.addEventListener('click', () => {
     currentPage += 1;
     renderTable();
   }
+});
+
+activityPreviousBtn.addEventListener('click', () => {
+  if (activityPage > 1) loadActivity(activityPage - 1);
+});
+
+activityNextBtn.addEventListener('click', () => {
+  if (activityPage < activityPageCount) loadActivity(activityPage + 1);
 });
 
 deviceForm.addEventListener('submit', async (event) => {

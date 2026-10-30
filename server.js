@@ -120,15 +120,24 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-app.get('/api/activity', async (_req, res) => {
+app.get('/api/activity', async (req, res) => {
+  const pageSize = 10;
+  const requestedPage = Number.parseInt(req.query.page, 10);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   try {
-    const result = await pool.query(`
+    const [countResult, eventsResult] = await Promise.all([
+      pool.query('SELECT count(*)::int AS total FROM activity_log'),
+      pool.query(`
       SELECT id, actor, action, details, created_at AS "createdAt"
       FROM activity_log
       ORDER BY id DESC
-      LIMIT 50
-    `);
-    res.json(result.rows);
+      LIMIT $1 OFFSET $2
+      `, [pageSize, (page - 1) * pageSize]),
+    ]);
+    const total = countResult.rows[0].total;
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    if (page > pageCount) return res.status(404).json({ error: 'Activity page not found.' });
+    res.json({ events: eventsResult.rows, total, page, pageSize, pageCount });
   } catch (error) {
     sendDatabaseError(res, error);
   }
