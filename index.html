@@ -89,6 +89,25 @@
               <input id="telcoProviderInput" name="telcoProvider" type="text" placeholder="e.g. Verizon" />
             </label>
             <label>
+              <span>SIM slots</span>
+              <select name="simSlotCount" data-sim-slot-count>
+                <option value="1">Single SIM</option>
+                <option value="2">Dual SIM</option>
+              </select>
+            </label>
+            <fieldset class="sim-slot-fields">
+              <legend>SIM slot 1</legend>
+              <label><span>SIM number</span><input name="sim1Number" type="text" /></label>
+              <label><span>ICCID</span><input name="sim1Iccid" type="text" /></label>
+              <label><span>IMEI</span><input name="sim1Imei" type="text" /></label>
+            </fieldset>
+            <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
+              <legend>SIM slot 2</legend>
+              <label><span>SIM number</span><input name="sim2Number" type="text" /></label>
+              <label><span>ICCID</span><input name="sim2Iccid" type="text" /></label>
+              <label><span>IMEI</span><input name="sim2Imei" type="text" /></label>
+            </fieldset>
+            <label>
               <span>Status</span>
               <select id="statusInput" name="status">
                 <option value="active">Active</option>
@@ -121,6 +140,7 @@
                 <th>AnyDesk ID</th>
                 <th>Color</th>
                 <th>TELCO Provider</th>
+                <th>SIM assignments</th>
                 <th>Status</th>
                 <th>Last Seen</th>
                 <th>Action</th>
@@ -165,6 +185,25 @@
               <input name="telcoProvider" type="text" />
             </label>
             <label class="device-form-label">
+              <span>SIM slots</span>
+              <select name="simSlotCount" data-sim-slot-count>
+                <option value="1">Single SIM</option>
+                <option value="2">Dual SIM</option>
+              </select>
+            </label>
+            <fieldset class="sim-slot-fields">
+              <legend>SIM slot 1</legend>
+              <label><span>SIM number</span><input name="sim1Number" type="text" /></label>
+              <label><span>ICCID</span><input name="sim1Iccid" type="text" /></label>
+              <label><span>IMEI</span><input name="sim1Imei" type="text" /></label>
+            </fieldset>
+            <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
+              <legend>SIM slot 2</legend>
+              <label><span>SIM number</span><input name="sim2Number" type="text" /></label>
+              <label><span>ICCID</span><input name="sim2Iccid" type="text" /></label>
+              <label><span>IMEI</span><input name="sim2Imei" type="text" /></label>
+            </fieldset>
+            <label class="device-form-label">
               <span>Status</span>
               <select name="status">
                 <option value="active">Active</option>
@@ -189,13 +228,17 @@
         <form id="switchSimForm" class="switch-form">
           <h2>Switch SIM</h2>
           <p id="switchSourceLabel" class="switch-description"></p>
-          <label id="switchSimIdField" class="device-form-label" for="switchSimIdInput">
-            <span>SIM identifier</span>
-            <input id="switchSimIdInput" name="simIdentifier" type="text" />
+          <label class="device-form-label" for="switchSourceSlotInput">
+            <span>SIM to move</span>
+            <select id="switchSourceSlotInput" name="sourceSlot" required></select>
           </label>
           <label class="filter-field" for="switchTargetInput">
-            <span>Destination phone</span>
+            <span>Destination asset</span>
             <select id="switchTargetInput" name="targetId" required></select>
+          </label>
+          <label class="device-form-label" for="switchTargetSlotInput">
+            <span>Destination SIM slot</span>
+            <select id="switchTargetSlotInput" name="targetSlot" required></select>
           </label>
           <p id="switchNote" class="switch-note"></p>
           <div class="dialog-actions">

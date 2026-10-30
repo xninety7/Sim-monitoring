@@ -278,6 +278,43 @@ h2 {
   gap: 14px;
 }
 
+.sim-slot-fields {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.sim-slot-fields[hidden] {
+  display: none;
+}
+
+.sim-slot-fields legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sim-slot-fields label {
+  min-width: 0;
+}
+
+.sim-assignment-cell {
+  min-width: 150px;
+  line-height: 1.7;
+  font-size: 0.88rem;
+}
+
+.sim-assignment-cell strong {
+  color: var(--muted);
+}
+
 .search-field, .filter-field {
   display: flex;
   flex-direction: column;
@@ -363,6 +400,11 @@ h2 {
   color: var(--text);
   background: #fff;
   font: inherit;
+}
+
+.sim-slot-fields label span {
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .switch-description,
@@ -525,7 +567,7 @@ h2 {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1040px;
+  min-width: 1180px;
 }
 
 thead {
@@ -611,5 +653,9 @@ tbody tr:hover {
   .activity-page-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sim-slot-fields {
+    grid-template-columns: 1fr;
   }
 }

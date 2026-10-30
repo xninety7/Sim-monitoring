@@ -33,11 +33,9 @@ const deviceFields = {
   anydeskId: 'anydesk_id',
   color: 'color',
   telcoProvider: 'telco_provider',
+  simSlotCount: 'sim_slot_count',
   status: 'status',
   lastSeen: 'last_seen',
-  simNumber: 'sim_number',
-  iccid: 'iccid',
-  imei: 'imei',
 };
 
 app.disable('x-powered-by');
@@ -53,12 +51,56 @@ function toDevice(row) {
     anydeskId: row.anydesk_id,
     color: row.color,
     telcoProvider: row.telco_provider,
+    simSlotCount: Number(row.sim_slot_count || 1),
     status: row.status,
     lastSeen: row.last_seen,
-    ...(row.sim_number ? { simNumber: row.sim_number } : {}),
-    ...(row.iccid ? { iccid: row.iccid } : {}),
-    ...(row.imei ? { imei: row.imei } : {}),
+    sims: row.sims || [],
   };
+}
+
+function normalizeSimSlots(input) {
+  if (Array.isArray(input.sims)) {
+    return input.sims.map((sim) => ({
+      slotNumber: Number(sim.slotNumber),
+      simNumber: typeof sim.simNumber === 'string' ? sim.simNumber.trim() : null,
+      iccid: typeof sim.iccid === 'string' ? sim.iccid.trim() : null,
+      imei: typeof sim.imei === 'string' ? sim.imei.trim() : null,
+    })).filter((sim) => sim.simNumber || sim.iccid || sim.imei);
+  }
+
+  // Accept older browser-import records that stored one SIM directly on the device.
+  if (input.simNumber || input.iccid || input.imei) {
+    return [{
+      slotNumber: 1,
+      simNumber: input.simNumber?.trim() || null,
+      iccid: input.iccid?.trim() || null,
+      imei: input.imei?.trim() || null,
+    }];
+  }
+  return [];
+}
+
+function validateSimSlots(input) {
+  if (input.simSlotCount !== undefined && ![1, 2].includes(input.simSlotCount)) {
+    return 'simSlotCount must be 1 or 2.';
+  }
+  if (input.sims === undefined) return null;
+  if (!Array.isArray(input.sims)) return 'sims must be an array.';
+  const slotCount = input.simSlotCount || 2;
+  const seenSlots = new Set();
+  for (const sim of input.sims) {
+    if (!sim || typeof sim !== 'object' || Array.isArray(sim)) return 'Each SIM slot must be an object.';
+    if (![1, 2].includes(sim.slotNumber) || sim.slotNumber > slotCount || seenSlots.has(sim.slotNumber)) {
+      return `SIM slots must be unique and within the configured ${slotCount} slot${slotCount === 1 ? '' : 's'}.`;
+    }
+    seenSlots.add(sim.slotNumber);
+    for (const field of ['simNumber', 'iccid', 'imei']) {
+      if (sim[field] !== undefined && sim[field] !== null && typeof sim[field] !== 'string') {
+        return `${field} in each SIM slot must be a string or null.`;
+      }
+    }
+  }
+  return null;
 }
 
 function validateDevice(input, { requireAll = true } = {}) {
@@ -88,7 +130,44 @@ function validateDevice(input, { requireAll = true } = {}) {
     }
   }
 
+  const simError = validateSimSlots(input);
+  if (simError) return simError;
+
   return null;
+}
+
+async function insertSimSlots(client, deviceId, sims) {
+  for (const sim of sims) {
+    await client.query(
+      `INSERT INTO device_sims (device_id, slot_number, sim_number, iccid, imei)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [deviceId, sim.slotNumber, sim.simNumber || null, sim.iccid || null, sim.imei || null],
+    );
+  }
+}
+
+async function loadDevicesWithSims(deviceRows) {
+  if (!deviceRows.length) return [];
+  const simResult = await pool.query(
+    `SELECT device_id, slot_number, sim_number, iccid, imei
+     FROM device_sims WHERE device_id = ANY($1::bigint[]) ORDER BY slot_number`,
+    [deviceRows.map((row) => row.id)],
+  );
+  const simsByDevice = new Map();
+  for (const row of simResult.rows) {
+    const sims = simsByDevice.get(Number(row.device_id)) || [];
+    sims.push({
+      slotNumber: Number(row.slot_number),
+      simNumber: row.sim_number,
+      iccid: row.iccid,
+      imei: row.imei,
+    });
+    simsByDevice.set(Number(row.device_id), sims);
+  }
+  return deviceRows.map((row) => toDevice({
+    ...row,
+    sims: simsByDevice.get(Number(row.id)) || [],
+  }));
 }
 
 function sendDatabaseError(res, error) {
@@ -146,12 +225,12 @@ app.get('/api/activity', async (req, res) => {
 app.get('/api/devices', async (_req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen,
-             sim_number, iccid, imei
+      SELECT id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider,
+             sim_slot_count, status, last_seen
       FROM devices
       ORDER BY id
     `);
-    res.json(result.rows.map(toDevice));
+    res.json(await loadDevicesWithSims(result.rows));
   } catch (error) {
     sendDatabaseError(res, error);
   }
@@ -166,6 +245,8 @@ app.post('/api/devices/import', async (req, res) => {
   for (const device of devices) {
     const validationError = validateDevice(device);
     if (validationError) return res.status(400).json({ error: validationError });
+    const simError = validateSimSlots({ ...device, simSlotCount: device.simSlotCount || 1 });
+    if (simError) return res.status(400).json({ error: simError });
   }
 
   const client = await pool.connect();
@@ -178,10 +259,11 @@ app.post('/api/devices/import', async (req, res) => {
     }
 
     for (const device of devices) {
-      await client.query(
+      const result = await client.query(
         `INSERT INTO devices
-           (device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+           (device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id`,
         [
           device.deviceName.trim(),
           device.attachedPc.trim(),
@@ -189,13 +271,12 @@ app.post('/api/devices/import', async (req, res) => {
           device.anydeskId?.trim() || null,
           device.color?.trim() || null,
           device.telcoProvider?.trim() || null,
+          device.simSlotCount || 1,
           device.status || 'inactive',
           device.lastSeen || '',
-          device.simNumber || null,
-          device.iccid || null,
-          device.imei || null,
         ],
       );
+      await insertSimSlots(client, result.rows[0].id, normalizeSimSlots(device));
     }
 
     await client.query('COMMIT');
@@ -212,18 +293,33 @@ app.post('/api/devices/import', async (req, res) => {
 app.post('/api/devices', async (req, res) => {
   const validationError = validateDevice(req.body);
   if (validationError) return res.status(400).json({ error: validationError });
+  const simError = validateSimSlots({ ...req.body, simSlotCount: req.body.simSlotCount || 1 });
+  if (simError) return res.status(400).json({ error: simError });
 
   try {
-    const { deviceName, attachedPc, phoneNumber, anydeskId, color, telcoProvider, status, lastSeen, simNumber, iccid, imei } = req.body;
-    const result = await pool.query(
-      `INSERT INTO devices
-         (device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei`,
-      [deviceName.trim(), attachedPc.trim(), phoneNumber.trim(), anydeskId?.trim() || null, color?.trim() || null, telcoProvider?.trim() || null, status || 'inactive', lastSeen || '', simNumber || null, iccid || null, imei || null],
-    );
+    const { deviceName, attachedPc, phoneNumber, anydeskId, color, telcoProvider, status, lastSeen } = req.body;
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('BEGIN');
+      result = await client.query(
+        `INSERT INTO devices
+           (device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen`,
+        [deviceName.trim(), attachedPc.trim(), phoneNumber.trim(), anydeskId?.trim() || null, color?.trim() || null, telcoProvider?.trim() || null, req.body.simSlotCount || 1, status || 'inactive', lastSeen || ''],
+      );
+      await insertSimSlots(client, result.rows[0].id, normalizeSimSlots(req.body));
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
     await logActivity(req, 'Added asset', deviceName.trim());
-    res.status(201).json(toDevice(result.rows[0]));
+    const [device] = await loadDevicesWithSims(result.rows);
+    res.status(201).json(device);
   } catch (error) {
     sendDatabaseError(res, error);
   }
@@ -236,8 +332,9 @@ app.patch('/api/devices/:id', async (req, res) => {
   const validationError = validateDevice(req.body, { requireAll: false });
   if (validationError) return res.status(400).json({ error: validationError });
 
-  const keys = Object.keys(req.body);
-  if (!keys.length || keys.some((key) => !Object.hasOwn(deviceFields, key))) {
+  const { sims, ...deviceInput } = req.body;
+  const keys = Object.keys(deviceInput);
+  if ((!keys.length && sims === undefined) || keys.some((key) => !Object.hasOwn(deviceFields, key))) {
     return res.status(400).json({ error: 'Provide at least one supported device field.' });
   }
 
@@ -248,75 +345,137 @@ app.patch('/api/devices/:id', async (req, res) => {
   });
   const assignments = keys.map((key, index) => `${deviceFields[key]} = $${index + 1}`);
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `UPDATE devices SET ${assignments.join(', ')}, updated_at = now()
-       WHERE id = $${keys.length + 1}
-      RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, status, last_seen, sim_number, iccid, imei`,
-      [...values, id],
+    await client.query('BEGIN');
+    const currentResult = await client.query(
+      'SELECT id, device_name, sim_slot_count FROM devices WHERE id = $1 FOR UPDATE',
+      [id],
     );
-    if (!result.rowCount) return res.status(404).json({ error: 'Device not found.' });
-    const deviceName = result.rows[0].device_name;
-    await logActivity(req, 'Updated asset', `Asset code ${deviceName}: ${keys.join(', ')}`);
-    res.json(toDevice(result.rows[0]));
+    if (!currentResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Device not found.' });
+    }
+    const current = currentResult.rows[0];
+    const nextSlotCount = deviceInput.simSlotCount ?? Number(current.sim_slot_count);
+    if (sims !== undefined) {
+      const simError = validateSimSlots({ simSlotCount: nextSlotCount, sims });
+      if (simError) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: simError });
+      }
+    } else if (nextSlotCount < Number(current.sim_slot_count)) {
+      const occupied = await client.query(
+        'SELECT 1 FROM device_sims WHERE device_id = $1 AND slot_number > $2 LIMIT 1',
+        [id, nextSlotCount],
+      );
+      if (occupied.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Move or clear the occupied SIM slot before reducing the slot count.' });
+      }
+    }
+
+    let updatedRow;
+    if (keys.length) {
+      const result = await client.query(
+        `UPDATE devices SET ${assignments.join(', ')}, updated_at = now()
+         WHERE id = $${keys.length + 1}
+         RETURNING id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen`,
+        [...values, id],
+      );
+      updatedRow = result.rows[0];
+    } else {
+      const result = await client.query(
+        `SELECT id, device_name, attached_pc, phone_number, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen
+         FROM devices WHERE id = $1`,
+        [id],
+      );
+      updatedRow = result.rows[0];
+    }
+
+    if (sims !== undefined) {
+      await client.query('DELETE FROM device_sims WHERE device_id = $1', [id]);
+      await insertSimSlots(client, id, normalizeSimSlots({ sims }));
+    }
+    await client.query('COMMIT');
+    await logActivity(req, 'Updated asset', `Asset code ${updatedRow.device_name}: ${[...keys, ...(sims !== undefined ? ['SIM slots'] : [])].join(', ')}`);
+    const [device] = await loadDevicesWithSims([updatedRow]);
+    res.json(device);
   } catch (error) {
+    await client.query('ROLLBACK');
     sendDatabaseError(res, error);
+  } finally {
+    client.release();
   }
 });
 
 app.post('/api/devices/:id/switch-sim', async (req, res) => {
   const sourceId = Number(req.params.id);
   const targetId = Number(req.body?.targetId);
+  const sourceSlot = Number(req.body?.sourceSlot);
+  const targetSlot = Number(req.body?.targetSlot);
   if (!Number.isSafeInteger(sourceId) || sourceId <= 0 || !Number.isSafeInteger(targetId) || targetId <= 0 || sourceId === targetId) {
-    return res.status(400).json({ error: 'Choose two different, valid device IDs.' });
+    return res.status(400).json({ error: 'Choose two different, valid assets.' });
   }
-  if (req.body?.simNumber !== undefined && (typeof req.body.simNumber !== 'string' || !req.body.simNumber.trim())) {
-    return res.status(400).json({ error: 'simNumber must be a non-empty string when provided.' });
+  if (![1, 2].includes(sourceSlot) || ![1, 2].includes(targetSlot)) {
+    return res.status(400).json({ error: 'Choose valid source and destination SIM slots.' });
   }
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query(
-      `SELECT id, device_name, attached_pc, phone_number, status, last_seen, sim_number, iccid, imei
-       FROM devices WHERE id = ANY($1::bigint[]) ORDER BY id FOR UPDATE`,
+    const devices = await client.query(
+      `SELECT id, device_name, sim_slot_count FROM devices
+       WHERE id = ANY($1::bigint[]) ORDER BY id FOR UPDATE`,
       [[sourceId, targetId]],
     );
-    if (result.rows.length !== 2) {
+    if (devices.rows.length !== 2) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Source or destination device not found.' });
+      return res.status(404).json({ error: 'Source or destination asset not found.' });
+    }
+    const source = devices.rows.find((device) => Number(device.id) === sourceId);
+    const target = devices.rows.find((device) => Number(device.id) === targetId);
+    if (sourceSlot > Number(source.sim_slot_count) || targetSlot > Number(target.sim_slot_count)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'The selected slot is not configured for that asset.' });
     }
 
-    const sourceRow = result.rows.find((row) => Number(row.id) === sourceId);
-    const targetRow = result.rows.find((row) => Number(row.id) === targetId);
-    const sourceHasSim = Boolean(sourceRow.sim_number || sourceRow.iccid || sourceRow.imei);
-
-    if (!sourceHasSim && !req.body.simNumber?.trim()) {
+    const slots = await client.query(
+      `SELECT device_id, slot_number, sim_number, iccid, imei
+       FROM device_sims
+       WHERE (device_id = $1 AND slot_number = $2) OR (device_id = $3 AND slot_number = $4)
+       FOR UPDATE`,
+      [sourceId, sourceSlot, targetId, targetSlot],
+    );
+    const sourceSim = slots.rows.find((sim) => Number(sim.device_id) === sourceId && Number(sim.slot_number) === sourceSlot);
+    const targetSim = slots.rows.find((sim) => Number(sim.device_id) === targetId && Number(sim.slot_number) === targetSlot);
+    if (!sourceSim) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'The source has no SIM assignment. Provide its SIM number.' });
+      return res.status(400).json({ error: `Source SIM slot ${sourceSlot} is empty.` });
     }
 
-    const sourceSim = sourceRow.sim_number || (sourceHasSim ? null : req.body.simNumber.trim());
-    const sourceIccid = sourceRow.iccid;
-    const sourceImei = sourceRow.imei;
-
     await client.query(
-      `UPDATE devices SET sim_number = NULL, iccid = NULL, imei = NULL, updated_at = now()
-       WHERE id = ANY($1::bigint[])`,
-      [[sourceId, targetId]],
+      `DELETE FROM device_sims
+       WHERE (device_id = $1 AND slot_number = $2) OR (device_id = $3 AND slot_number = $4)`,
+      [sourceId, sourceSlot, targetId, targetSlot],
     );
     await client.query(
-      `UPDATE devices SET sim_number = $1, iccid = $2, imei = $3, updated_at = now() WHERE id = $4`,
-      [targetRow.sim_number, targetRow.iccid, targetRow.imei, sourceId],
+      `INSERT INTO device_sims (device_id, slot_number, sim_number, iccid, imei)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [targetId, targetSlot, sourceSim.sim_number, sourceSim.iccid, sourceSim.imei],
     );
-    await client.query(
-      `UPDATE devices SET sim_number = $1, iccid = $2, imei = $3, updated_at = now() WHERE id = $4`,
-      [sourceSim, sourceIccid, sourceImei, targetId],
-    );
+    if (targetSim) {
+      await client.query(
+        `INSERT INTO device_sims (device_id, slot_number, sim_number, iccid, imei)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [sourceId, sourceSlot, targetSim.sim_number, targetSim.iccid, targetSim.imei],
+      );
+    }
 
     await client.query('COMMIT');
-    await logActivity(req, 'Switched SIM', `${sourceRow.device_name} ↔ ${targetRow.device_name}`);
-    res.json({ switched: true, sourceId, targetId });
+    const outcome = targetSim ? 'swapped with' : 'moved to';
+    await logActivity(req, targetSim ? 'Swapped SIM slots' : 'Moved SIM', `${source.device_name} slot ${sourceSlot} ${outcome} ${target.device_name} slot ${targetSlot}`);
+    res.json({ switched: true, sourceId, sourceSlot, targetId, targetSlot, swapped: Boolean(targetSim) });
   } catch (error) {
     await client.query('ROLLBACK');
     sendDatabaseError(res, error);
@@ -364,6 +523,15 @@ async function initializeDatabase() {
       WHERE NOT EXISTS (SELECT 1 FROM devices)
     `);
   }
+
+  // Keep the legacy bootstrap seed compatible by copying its SIM identifiers into slot 1.
+  await pool.query(`
+    INSERT INTO device_sims (device_id, slot_number, sim_number, iccid, imei)
+    SELECT id, 1, sim_number, iccid, imei
+    FROM devices
+    WHERE sim_number IS NOT NULL OR iccid IS NOT NULL OR imei IS NOT NULL
+    ON CONFLICT (device_id, slot_number) DO NOTHING
+  `);
 }
 
 async function start() {
