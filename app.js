@@ -75,7 +75,7 @@ async function loadDevices() {
     importLocalBtn.hidden = true;
     showMessage(`Could not load shared devices: ${error.message}`, true);
     resultsCount.textContent = 'Database unavailable';
-    tableBody.innerHTML = '<tr><td colspan="10" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
   }
 }
 
@@ -117,11 +117,10 @@ function getFilteredDevices() {
     const matchSearch = !q || [
       device.deviceName,
       device.attachedPc,
-      device.phoneNumber,
       device.anydeskId,
       device.color,
       device.telcoProvider,
-      ...(device.sims || []).flatMap((sim) => [sim.simNumber, sim.iccid, sim.imei]),
+      ...(device.sims || []).map((sim) => sim.phoneNumber),
     ].some((value) => String(value || '').toLowerCase().includes(q));
 
     const matchStatus = selectedStatus === 'all' || device.status === selectedStatus;
@@ -144,7 +143,7 @@ function renderTable() {
   if (!filtered.length) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="10" class="empty-state">No matching devices found.</td>
+        <td colspan="9" class="empty-state">No matching devices found.</td>
       </tr>
     `;
     return;
@@ -162,17 +161,16 @@ function renderTable() {
           </div>
         </td>
         <td>${escapeHtml(device.attachedPc)}</td>
-        <td>${escapeHtml(device.phoneNumber)}</td>
         <td>${escapeHtml(device.anydeskId || '—')}</td>
         <td>${escapeHtml(device.color || '—')}</td>
         <td>${escapeHtml(device.telcoProvider || '—')}</td>
-        <td class="sim-assignment-cell">${renderSimAssignments(device)}</td>
+        <td class="sim-assignment-cell">${renderPhoneNumbers(device)}</td>
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
         </td>
         <td>${escapeHtml(device.lastSeen || '—')}</td>
         <td>
-          <button class="switch-btn" data-id="${device.id}" type="button" ${hasSimAssignments(device) ? '' : 'disabled'}>Switch SIM</button>
+          <button class="switch-btn" data-id="${device.id}" type="button" ${hasSimAssignments(device) ? '' : 'disabled'}>Move number</button>
           <button class="edit-btn" data-id="${device.id}" type="button">Edit</button>
           <button class="delete-btn" data-id="${device.id}" type="button">Delete</button>
         </td>
@@ -181,17 +179,16 @@ function renderTable() {
     .join('');
 }
 
-function renderSimAssignments(device) {
+function renderPhoneNumbers(device) {
   return Array.from({ length: device.simSlotCount || 1 }, (_, index) => {
     const slotNumber = index + 1;
     const sim = device.sims?.find((assignment) => assignment.slotNumber === slotNumber);
-    const identifier = sim?.simNumber || sim?.iccid || sim?.imei || 'Empty';
-    return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(identifier)}</span>`;
+    return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(sim?.phoneNumber || 'Empty')}</span>`;
   }).join('<br>');
 }
 
 function hasSimAssignments(device) {
-  return Boolean(device.sims?.some((sim) => sim.simNumber || sim.iccid || sim.imei));
+  return Boolean(device.sims?.some((sim) => sim.phoneNumber));
 }
 
 function escapeHtml(value) {
@@ -214,11 +211,9 @@ function readSimSlots(formData, slotCount) {
     const slotNumber = index + 1;
     const sim = {
       slotNumber,
-      simNumber: String(formData.get(`sim${slotNumber}Number`) || '').trim(),
-      iccid: String(formData.get(`sim${slotNumber}Iccid`) || '').trim(),
-      imei: String(formData.get(`sim${slotNumber}Imei`) || '').trim(),
+      phoneNumber: String(formData.get(`sim${slotNumber}PhoneNumber`) || '').trim(),
     };
-    return sim.simNumber || sim.iccid || sim.imei ? sim : null;
+    return sim.phoneNumber ? sim : null;
   }).filter(Boolean);
 }
 
@@ -226,9 +221,11 @@ for (const form of [deviceForm, editDeviceForm]) {
   form.elements.simSlotCount.addEventListener('change', () => {
     const nextSlotCount = Number(form.elements.simSlotCount.value);
     const currentAsset = allDevices.find((device) => device.id === editDeviceId);
-    if (form === editDeviceForm && nextSlotCount === 1 && currentAsset?.sims.some((sim) => sim.slotNumber === 2)) {
+    const secondSlotHasNumber = Boolean(form.elements.sim2PhoneNumber.value.trim())
+      || Boolean(currentAsset?.sims.some((sim) => sim.slotNumber === 2 && sim.phoneNumber));
+    if (nextSlotCount === 1 && secondSlotHasNumber) {
       form.elements.simSlotCount.value = '2';
-      showMessage('Move or remove the SIM in slot 2 before changing this asset to single SIM.', true);
+      showMessage('Move or clear the phone number in slot 2 before changing to single SIM.', true);
       return;
     }
     setSimSlotVisibility(form, nextSlotCount);
@@ -266,7 +263,6 @@ deviceForm.addEventListener('submit', async (event) => {
   const newDevice = {
     deviceName: String(formData.get('deviceName')).trim(),
     attachedPc: String(formData.get('attachedPc')).trim(),
-    phoneNumber: String(formData.get('phoneNumber')).trim(),
     anydeskId: String(formData.get('anydeskId') || '').trim(),
     color: String(formData.get('color') || '').trim(),
     telcoProvider: String(formData.get('telcoProvider') || '').trim(),
@@ -318,14 +314,12 @@ function openEditDialog(deviceId) {
   if (!device) return;
 
   editDeviceId = deviceId;
-  for (const field of ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'telcoProvider', 'simSlotCount', 'status', 'lastSeen']) {
+  for (const field of ['deviceName', 'attachedPc', 'anydeskId', 'color', 'telcoProvider', 'simSlotCount', 'status', 'lastSeen']) {
     editDeviceForm.elements[field].value = device[field] || (field === 'status' ? 'active' : '');
   }
   for (const slotNumber of [1, 2]) {
     const sim = device.sims?.find((assignment) => assignment.slotNumber === slotNumber);
-    editDeviceForm.elements[`sim${slotNumber}Number`].value = sim?.simNumber || '';
-    editDeviceForm.elements[`sim${slotNumber}Iccid`].value = sim?.iccid || '';
-    editDeviceForm.elements[`sim${slotNumber}Imei`].value = sim?.imei || '';
+    editDeviceForm.elements[`sim${slotNumber}PhoneNumber`].value = sim?.phoneNumber || '';
   }
   setSimSlotVisibility(editDeviceForm, device.simSlotCount || 1);
   editDeviceDialog.showModal();
@@ -339,7 +333,7 @@ editDeviceForm.addEventListener('submit', async (event) => {
 
   const formData = new FormData(editDeviceForm);
   const updates = Object.fromEntries(
-    ['deviceName', 'attachedPc', 'phoneNumber', 'anydeskId', 'color', 'telcoProvider', 'status', 'lastSeen']
+    ['deviceName', 'attachedPc', 'anydeskId', 'color', 'telcoProvider', 'status', 'lastSeen']
       .map((field) => [field, String(formData.get(field) || '').trim()]),
   );
   updates.simSlotCount = Number(formData.get('simSlotCount'));
@@ -363,17 +357,16 @@ function openSwitchDialog(sourceId) {
   const source = allDevices.find((device) => device.id === sourceId);
   if (!source) return;
 
-  const assignedSlots = (source.sims || []).filter((sim) => sim.simNumber || sim.iccid || sim.imei);
+  const assignedSlots = (source.sims || []).filter((sim) => sim.phoneNumber);
   if (!assignedSlots.length) {
-    showMessage('Add a SIM to one of this asset’s slots before switching it.', true);
+    showMessage('Add a phone number to one of this asset’s slots before moving it.', true);
     return;
   }
 
   switchSourceId = sourceId;
-  switchSourceLabel.textContent = `Choose which assigned SIM to move from ${source.deviceName} (${source.attachedPc}).`;
+  switchSourceLabel.textContent = `Choose which phone number to move from ${source.deviceName} (${source.attachedPc}).`;
   switchSourceSlotInput.innerHTML = assignedSlots.map((sim) => {
-    const identifier = sim.simNumber || sim.iccid || sim.imei;
-    return `<option value="${sim.slotNumber}">Slot ${sim.slotNumber} · ${escapeHtml(identifier)}</option>`;
+    return `<option value="${sim.slotNumber}">Slot ${sim.slotNumber} · ${escapeHtml(sim.phoneNumber)}</option>`;
   }).join('');
 
   const destinations = allDevices.filter((device) => device.id !== sourceId);
@@ -401,17 +394,17 @@ function updateSwitchDestinationSlots(refreshSlots = false) {
   if (refreshSlots) {
     switchTargetSlotInput.innerHTML = Array.from({ length: target.simSlotCount || 1 }, (_, index) => {
       const slotNumber = index + 1;
-      const assigned = target.sims?.find((sim) => sim.slotNumber === slotNumber && (sim.simNumber || sim.iccid || sim.imei));
-      const identifier = assigned ? ` — occupied by ${escapeHtml(assigned.simNumber || assigned.iccid || assigned.imei)}` : ' — empty';
+      const assigned = target.sims?.find((sim) => sim.slotNumber === slotNumber && sim.phoneNumber);
+      const identifier = assigned ? ` — occupied by ${escapeHtml(assigned.phoneNumber)}` : ' — empty';
       return `<option value="${slotNumber}">Slot ${slotNumber}${identifier}</option>`;
     }).join('');
   }
 
   const selectedSlot = target.sims?.find((sim) => sim.slotNumber === Number(switchTargetSlotInput.value));
-  if (selectedSlot?.simNumber || selectedSlot?.iccid || selectedSlot?.imei) {
-    switchNote.textContent = 'This destination slot is occupied. Confirming will swap the two SIM assignments.';
+  if (selectedSlot?.phoneNumber) {
+    switchNote.textContent = 'This destination slot already has a number. Confirming will swap the numbers between slots.';
   } else {
-    switchNote.textContent = 'This destination slot is empty. The selected SIM will move there.';
+    switchNote.textContent = 'This destination slot is empty. The selected phone number will move there.';
   }
   confirmSwitchBtn.disabled = false;
 }
@@ -431,14 +424,14 @@ switchSimForm.addEventListener('submit', async (event) => {
   try {
     const sourceSlot = Number(switchSourceSlotInput.value);
     const targetSlot = Number(switchTargetSlotInput.value);
-    const targetOccupied = target.sims?.some((sim) => sim.slotNumber === targetSlot && (sim.simNumber || sim.iccid || sim.imei));
+    const targetOccupied = target.sims?.some((sim) => sim.slotNumber === targetSlot && sim.phoneNumber);
     await apiRequest(`/api/devices/${source.id}/switch-sim`, {
       method: 'POST',
       body: JSON.stringify({ targetId: target.id, sourceSlot, targetSlot }),
     });
     switchSimDialog.close();
     await loadDevices();
-    showMessage(`SIM ${targetOccupied ? 'swapped' : 'moved'} from ${source.deviceName} slot ${sourceSlot} to ${target.deviceName} slot ${targetSlot}.`);
+    showMessage(`Phone number ${targetOccupied ? 'swapped' : 'moved'} from ${source.deviceName} slot ${sourceSlot} to ${target.deviceName} slot ${targetSlot}.`);
   } catch (error) {
     showMessage(error.message, true);
   }

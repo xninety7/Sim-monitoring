@@ -73,10 +73,6 @@
               <input id="attachedPcInput" name="attachedPc" type="text" required />
             </label>
             <label>
-              <span>Phone number</span>
-              <input id="phoneNumberInput" name="phoneNumber" type="text" required />
-            </label>
-            <label>
               <span>AnyDesk ID</span>
               <input id="anydeskIdInput" name="anydeskId" type="text" />
             </label>
@@ -89,23 +85,19 @@
               <input id="telcoProviderInput" name="telcoProvider" type="text" placeholder="e.g. Verizon" />
             </label>
             <label>
-              <span>SIM slots</span>
+              <span>Phone number slots</span>
               <select name="simSlotCount" data-sim-slot-count>
-                <option value="1">Single SIM</option>
-                <option value="2">Dual SIM</option>
+                <option value="1">One number</option>
+                <option value="2">Two numbers</option>
               </select>
             </label>
             <fieldset class="sim-slot-fields">
               <legend>SIM slot 1</legend>
-              <label><span>SIM number</span><input name="sim1Number" type="text" /></label>
-              <label><span>ICCID</span><input name="sim1Iccid" type="text" /></label>
-              <label><span>IMEI</span><input name="sim1Imei" type="text" /></label>
+              <label><span>Phone number</span><input name="sim1PhoneNumber" type="tel" /></label>
             </fieldset>
             <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
               <legend>SIM slot 2</legend>
-              <label><span>SIM number</span><input name="sim2Number" type="text" /></label>
-              <label><span>ICCID</span><input name="sim2Iccid" type="text" /></label>
-              <label><span>IMEI</span><input name="sim2Imei" type="text" /></label>
+              <label><span>Phone number</span><input name="sim2PhoneNumber" type="tel" /></label>
             </fieldset>
             <label>
               <span>Status</span>
@@ -136,11 +128,10 @@
               <tr>
                 <th>Asset code</th>
                 <th>Attached PC</th>
-                <th>Phone Number</th>
                 <th>AnyDesk ID</th>
                 <th>Color</th>
                 <th>TELCO Provider</th>
-                <th>SIM assignments</th>
+                <th>Phone numbers</th>
                 <th>Status</th>
                 <th>Last Seen</th>
                 <th>Action</th>
@@ -169,10 +160,6 @@
               <input name="attachedPc" type="text" required />
             </label>
             <label class="device-form-label">
-              <span>Phone number</span>
-              <input name="phoneNumber" type="text" required />
-            </label>
-            <label class="device-form-label">
               <span>AnyDesk ID</span>
               <input name="anydeskId" type="text" />
             </label>
@@ -185,23 +172,19 @@
               <input name="telcoProvider" type="text" />
             </label>
             <label class="device-form-label">
-              <span>SIM slots</span>
+              <span>Phone number slots</span>
               <select name="simSlotCount" data-sim-slot-count>
-                <option value="1">Single SIM</option>
-                <option value="2">Dual SIM</option>
+                <option value="1">One number</option>
+                <option value="2">Two numbers</option>
               </select>
             </label>
             <fieldset class="sim-slot-fields">
               <legend>SIM slot 1</legend>
-              <label><span>SIM number</span><input name="sim1Number" type="text" /></label>
-              <label><span>ICCID</span><input name="sim1Iccid" type="text" /></label>
-              <label><span>IMEI</span><input name="sim1Imei" type="text" /></label>
+              <label><span>Phone number</span><input name="sim1PhoneNumber" type="tel" /></label>
             </fieldset>
             <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
               <legend>SIM slot 2</legend>
-              <label><span>SIM number</span><input name="sim2Number" type="text" /></label>
-              <label><span>ICCID</span><input name="sim2Iccid" type="text" /></label>
-              <label><span>IMEI</span><input name="sim2Imei" type="text" /></label>
+              <label><span>Phone number</span><input name="sim2PhoneNumber" type="tel" /></label>
             </fieldset>
             <label class="device-form-label">
               <span>Status</span>
@@ -226,10 +209,10 @@
 
       <dialog id="switchSimDialog" class="switch-dialog">
         <form id="switchSimForm" class="switch-form">
-          <h2>Switch SIM</h2>
+          <h2>Move phone number</h2>
           <p id="switchSourceLabel" class="switch-description"></p>
           <label class="device-form-label" for="switchSourceSlotInput">
-            <span>SIM to move</span>
+            <span>Phone number to move</span>
             <select id="switchSourceSlotInput" name="sourceSlot" required></select>
           </label>
           <label class="filter-field" for="switchTargetInput">
@@ -237,7 +220,7 @@
             <select id="switchTargetInput" name="targetId" required></select>
           </label>
           <label class="device-form-label" for="switchTargetSlotInput">
-            <span>Destination SIM slot</span>
+            <span>Destination phone-number slot</span>
             <select id="switchTargetSlotInput" name="targetSlot" required></select>
           </label>
           <p id="switchNote" class="switch-note"></p>

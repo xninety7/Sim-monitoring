@@ -4,11 +4,11 @@ A shared SIM/device monitoring dashboard backed by an Express API and PostgreSQL
 
 ## Features
 - Shared PostgreSQL device inventory
-- Single- or dual-SIM slot tracking per asset
+- One or two phone numbers per asset
 - Search and status filtering
 - Add and delete devices
 - Edit and persist Last Seen values
-- Move a SIM between asset slots or swap occupied slots
+- Move a phone number between asset slots or swap occupied slots
 - Optional one-time import of saved records from a browser
 
 ## Requirements
@@ -21,7 +21,7 @@ Create a database, for example `sim_monitoring`, and copy `.env.example` to `.en
 
 The application creates its tables and indexes on startup. For hosted PostgreSQL services that require TLS, set `PGSSL=true`.
 
-SIM assignments are stored separately from assets by slot number (1 or 2). On startup the schema migration copies any existing `sim_number`, `iccid`, and `imei` on an asset into slot 1, preserving existing assignments.
+Phone numbers are stored by asset slot (1 or 2), so an asset can have a separate number in each slot. On startup, existing asset-level phone numbers are migrated into slot 1; the old asset-level field is then cleared to avoid duplicate tracking. SIM-card and handset identifiers such as SIM number, ICCID, and IMEI are not tracked.
 
 ## Local development
 
@@ -122,9 +122,9 @@ The application currently has no built-in user accounts or role permissions. The
 
 ### Activity log and identifying users
 
-The dashboard records successful device additions, edits, deletions, SIM switches, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
+The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
 
-For dual-SIM assets, set SIM slots to **Dual SIM** and fill either or both slot records. **Switch SIM** moves the selected source slot to a destination slot; if that destination slot is occupied, the two SIM assignments swap. All slot assignments are updated transactionally and switch actions record both assets and slot numbers in the activity log.
+For assets with two numbers, set **Phone number slots** to **Two numbers** and fill either or both slots. **Move number** moves the selected source slot to a destination slot; if that destination slot already has a number, the two numbers swap. Changes are transactional and logged with both asset codes and slot numbers.
 
 To identify individual teammates, give each person a distinct Basic Auth username. Add users without `-c` so the existing password file is preserved:
 
@@ -142,7 +142,7 @@ If everyone signs in using the same username, the log cannot distinguish them. E
 - `POST /api/devices` — add a device
 - `PATCH /api/devices/:id` — update supported device fields
 - `DELETE /api/devices/:id` — delete a device
-- `POST /api/devices/:id/switch-sim` — move a populated `sourceSlot` to a `targetId`/`targetSlot`; swaps if destination is occupied
+- `POST /api/devices/:id/switch-sim` — move a populated `sourceSlot` phone number to a `targetId`/`targetSlot`; swaps if the destination is occupied
 - `POST /api/devices/import` — import records once into an empty database
 - `GET /api/activity` — retrieve the latest activity events
 
