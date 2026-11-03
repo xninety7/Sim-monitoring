@@ -81,10 +81,6 @@
               <input id="colorInput" name="color" type="text" placeholder="e.g. Black" />
             </label>
             <label>
-              <span>TELCO provider</span>
-              <input id="telcoProviderInput" name="telcoProvider" type="text" placeholder="e.g. Verizon" />
-            </label>
-            <label>
               <span>Phone number slots</span>
               <select name="simSlotCount" data-sim-slot-count>
                 <option value="1">One number</option>
@@ -92,12 +88,14 @@
               </select>
             </label>
             <fieldset class="sim-slot-fields">
-              <legend>SIM slot 1</legend>
+              <legend>Phone number 1</legend>
               <label><span>Phone number</span><input name="sim1PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim1TelcoProvider" type="text" placeholder="e.g. Verizon" /></label>
             </fieldset>
             <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
-              <legend>SIM slot 2</legend>
+              <legend>Phone number 2</legend>
               <label><span>Phone number</span><input name="sim2PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim2TelcoProvider" type="text" placeholder="e.g. Verizon" /></label>
             </fieldset>
             <label>
               <span>Status</span>
@@ -130,7 +128,6 @@
                 <th>Attached PC</th>
                 <th>AnyDesk ID</th>
                 <th>Color</th>
-                <th>TELCO Provider</th>
                 <th>Phone numbers</th>
                 <th>Status</th>
                 <th>Last Seen</th>
@@ -168,10 +165,6 @@
               <input name="color" type="text" />
             </label>
             <label class="device-form-label">
-              <span>TELCO provider</span>
-              <input name="telcoProvider" type="text" />
-            </label>
-            <label class="device-form-label">
               <span>Phone number slots</span>
               <select name="simSlotCount" data-sim-slot-count>
                 <option value="1">One number</option>
@@ -179,12 +172,14 @@
               </select>
             </label>
             <fieldset class="sim-slot-fields">
-              <legend>SIM slot 1</legend>
+              <legend>Phone number 1</legend>
               <label><span>Phone number</span><input name="sim1PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim1TelcoProvider" type="text" /></label>
             </fieldset>
             <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
-              <legend>SIM slot 2</legend>
+              <legend>Phone number 2</legend>
               <label><span>Phone number</span><input name="sim2PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim2TelcoProvider" type="text" /></label>
             </fieldset>
             <label class="device-form-label">
               <span>Status</span>

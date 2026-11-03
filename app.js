@@ -119,8 +119,7 @@ function getFilteredDevices() {
       device.attachedPc,
       device.anydeskId,
       device.color,
-      device.telcoProvider,
-      ...(device.sims || []).map((sim) => sim.phoneNumber),
+      ...(device.sims || []).flatMap((sim) => [sim.phoneNumber, sim.telcoProvider]),
     ].some((value) => String(value || '').toLowerCase().includes(q));
 
     const matchStatus = selectedStatus === 'all' || device.status === selectedStatus;
@@ -163,7 +162,6 @@ function renderTable() {
         <td>${escapeHtml(device.attachedPc)}</td>
         <td>${escapeHtml(device.anydeskId || '—')}</td>
         <td>${escapeHtml(device.color || '—')}</td>
-        <td>${escapeHtml(device.telcoProvider || '—')}</td>
         <td class="sim-assignment-cell">${renderPhoneNumbers(device)}</td>
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
@@ -183,7 +181,9 @@ function renderPhoneNumbers(device) {
   return Array.from({ length: device.simSlotCount || 1 }, (_, index) => {
     const slotNumber = index + 1;
     const sim = device.sims?.find((assignment) => assignment.slotNumber === slotNumber);
-    return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(sim?.phoneNumber || 'Empty')}</span>`;
+    const number = sim?.phoneNumber || 'Empty';
+    const provider = sim?.telcoProvider ? ` · ${escapeHtml(sim.telcoProvider)}` : '';
+    return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(number)}${provider}</span>`;
   }).join('<br>');
 }
 
@@ -212,8 +212,9 @@ function readSimSlots(formData, slotCount) {
     const sim = {
       slotNumber,
       phoneNumber: String(formData.get(`sim${slotNumber}PhoneNumber`) || '').trim(),
+      telcoProvider: String(formData.get(`sim${slotNumber}TelcoProvider`) || '').trim(),
     };
-    return sim.phoneNumber ? sim : null;
+    return sim.phoneNumber || sim.telcoProvider ? sim : null;
   }).filter(Boolean);
 }
 
@@ -265,7 +266,6 @@ deviceForm.addEventListener('submit', async (event) => {
     attachedPc: String(formData.get('attachedPc')).trim(),
     anydeskId: String(formData.get('anydeskId') || '').trim(),
     color: String(formData.get('color') || '').trim(),
-    telcoProvider: String(formData.get('telcoProvider') || '').trim(),
     simSlotCount: Number(formData.get('simSlotCount')),
     sims: readSimSlots(formData, Number(formData.get('simSlotCount'))),
     status: String(formData.get('status')) || 'active',
@@ -314,12 +314,13 @@ function openEditDialog(deviceId) {
   if (!device) return;
 
   editDeviceId = deviceId;
-  for (const field of ['deviceName', 'attachedPc', 'anydeskId', 'color', 'telcoProvider', 'simSlotCount', 'status', 'lastSeen']) {
+  for (const field of ['deviceName', 'attachedPc', 'anydeskId', 'color', 'simSlotCount', 'status', 'lastSeen']) {
     editDeviceForm.elements[field].value = device[field] || (field === 'status' ? 'active' : '');
   }
   for (const slotNumber of [1, 2]) {
     const sim = device.sims?.find((assignment) => assignment.slotNumber === slotNumber);
     editDeviceForm.elements[`sim${slotNumber}PhoneNumber`].value = sim?.phoneNumber || '';
+    editDeviceForm.elements[`sim${slotNumber}TelcoProvider`].value = sim?.telcoProvider || '';
   }
   setSimSlotVisibility(editDeviceForm, device.simSlotCount || 1);
   editDeviceDialog.showModal();
@@ -333,7 +334,7 @@ editDeviceForm.addEventListener('submit', async (event) => {
 
   const formData = new FormData(editDeviceForm);
   const updates = Object.fromEntries(
-    ['deviceName', 'attachedPc', 'anydeskId', 'color', 'telcoProvider', 'status', 'lastSeen']
+    ['deviceName', 'attachedPc', 'anydeskId', 'color', 'status', 'lastSeen']
       .map((field) => [field, String(formData.get(field) || '').trim()]),
   );
   updates.simSlotCount = Number(formData.get('simSlotCount'));
@@ -366,12 +367,13 @@ function openSwitchDialog(sourceId) {
   switchSourceId = sourceId;
   switchSourceLabel.textContent = `Choose which phone number to move from ${source.deviceName} (${source.attachedPc}).`;
   switchSourceSlotInput.innerHTML = assignedSlots.map((sim) => {
-    return `<option value="${sim.slotNumber}">Slot ${sim.slotNumber} · ${escapeHtml(sim.phoneNumber)}</option>`;
+    const details = [sim.phoneNumber, sim.telcoProvider].filter(Boolean).join(' · ');
+    return `<option value="${sim.slotNumber}">Slot ${sim.slotNumber} · ${escapeHtml(details)}</option>`;
   }).join('');
 
   const destinations = allDevices.filter((device) => device.id !== sourceId);
   switchTargetInput.innerHTML = destinations.map((device) => {
-    const label = `${device.deviceName} · ${device.attachedPc} · ${device.simSlotCount} SIM slot${device.simSlotCount === 1 ? '' : 's'}`;
+    const label = `${device.deviceName} · ${device.attachedPc} · ${device.simSlotCount} phone number slot${device.simSlotCount === 1 ? '' : 's'}`;
     return `<option value="${device.id}">${escapeHtml(label)}</option>`;
   }).join('');
   switchTargetInput.disabled = !destinations.length;
@@ -394,14 +396,15 @@ function updateSwitchDestinationSlots(refreshSlots = false) {
   if (refreshSlots) {
     switchTargetSlotInput.innerHTML = Array.from({ length: target.simSlotCount || 1 }, (_, index) => {
       const slotNumber = index + 1;
-      const assigned = target.sims?.find((sim) => sim.slotNumber === slotNumber && sim.phoneNumber);
-      const identifier = assigned ? ` — occupied by ${escapeHtml(assigned.phoneNumber)}` : ' — empty';
+      const assigned = target.sims?.find((sim) => sim.slotNumber === slotNumber && (sim.phoneNumber || sim.telcoProvider));
+      const details = assigned ? [assigned.phoneNumber, assigned.telcoProvider].filter(Boolean).join(' · ') : '';
+      const identifier = assigned ? ` — occupied by ${escapeHtml(details)}` : ' — empty';
       return `<option value="${slotNumber}">Slot ${slotNumber}${identifier}</option>`;
     }).join('');
   }
 
   const selectedSlot = target.sims?.find((sim) => sim.slotNumber === Number(switchTargetSlotInput.value));
-  if (selectedSlot?.phoneNumber) {
+  if (selectedSlot?.phoneNumber || selectedSlot?.telcoProvider) {
     switchNote.textContent = 'This destination slot already has a number. Confirming will swap the numbers between slots.';
   } else {
     switchNote.textContent = 'This destination slot is empty. The selected phone number will move there.';
@@ -424,7 +427,7 @@ switchSimForm.addEventListener('submit', async (event) => {
   try {
     const sourceSlot = Number(switchSourceSlotInput.value);
     const targetSlot = Number(switchTargetSlotInput.value);
-    const targetOccupied = target.sims?.some((sim) => sim.slotNumber === targetSlot && sim.phoneNumber);
+    const targetOccupied = target.sims?.some((sim) => sim.slotNumber === targetSlot && (sim.phoneNumber || sim.telcoProvider));
     await apiRequest(`/api/devices/${source.id}/switch-sim`, {
       method: 'POST',
       body: JSON.stringify({ targetId: target.id, sourceSlot, targetSlot }),

@@ -124,7 +124,7 @@ The application currently has no built-in user accounts or role permissions. The
 
 The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
 
-For assets with two numbers, set **Phone number slots** to **Two numbers** and fill either or both slots. **Move number** moves the selected source slot to a destination slot; if that destination slot already has a number, the two numbers swap. Changes are transactional and logged with both asset codes and slot numbers.
+For assets with two numbers, set **Phone number slots** to **Two numbers** and fill each slot's phone number and TELCO provider. **Move number** moves the selected source slot to a destination slot; if that destination slot is occupied, the phone number and provider move together as a swap. Changes are transactional and logged with both asset codes and slot numbers.
 
 To identify individual teammates, give each person a distinct Basic Auth username. Add users without `-c` so the existing password file is preserved:
 

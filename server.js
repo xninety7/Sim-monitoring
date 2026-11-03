@@ -31,7 +31,6 @@ const deviceFields = {
   attachedPc: 'attached_pc',
   anydeskId: 'anydesk_id',
   color: 'color',
-  telcoProvider: 'telco_provider',
   simSlotCount: 'sim_slot_count',
   status: 'status',
   lastSeen: 'last_seen',
@@ -48,7 +47,6 @@ function toDevice(row) {
     attachedPc: row.attached_pc,
     anydeskId: row.anydesk_id,
     color: row.color,
-    telcoProvider: row.telco_provider,
     simSlotCount: Number(row.sim_slot_count || 1),
     status: row.status,
     lastSeen: row.last_seen,
@@ -58,10 +56,18 @@ function toDevice(row) {
 
 function normalizeSimSlots(input) {
   if (Array.isArray(input.sims)) {
-    return input.sims.map((sim) => ({
+    const sims = input.sims.map((sim) => ({
       slotNumber: Number(sim.slotNumber),
       phoneNumber: typeof sim.phoneNumber === 'string' ? sim.phoneNumber.trim() : null,
-    })).filter((sim) => sim.phoneNumber);
+      telcoProvider: typeof sim.telcoProvider === 'string' ? sim.telcoProvider.trim() : null,
+    })).filter((sim) => sim.phoneNumber || sim.telcoProvider);
+    const legacyProvider = typeof input.telcoProvider === 'string' ? input.telcoProvider.trim() : '';
+    if (legacyProvider && !sims.some((sim) => sim.slotNumber === 1 && sim.telcoProvider)) {
+      const firstSlot = sims.find((sim) => sim.slotNumber === 1);
+      if (firstSlot) firstSlot.telcoProvider = legacyProvider;
+      else sims.push({ slotNumber: 1, phoneNumber: null, telcoProvider: legacyProvider });
+    }
+    return sims;
   }
 
   // Accept older browser-import records that stored one phone number directly on the asset.
@@ -69,6 +75,7 @@ function normalizeSimSlots(input) {
     return [{
       slotNumber: 1,
       phoneNumber: input.phoneNumber.trim(),
+      telcoProvider: input.telcoProvider?.trim() || null,
     }];
   }
   return [];
@@ -85,11 +92,14 @@ function validateSimSlots(input) {
   for (const sim of input.sims) {
     if (!sim || typeof sim !== 'object' || Array.isArray(sim)) return 'Each SIM slot must be an object.';
     if (![1, 2].includes(sim.slotNumber) || sim.slotNumber > slotCount || seenSlots.has(sim.slotNumber)) {
-      return `SIM slots must be unique and within the configured ${slotCount} slot${slotCount === 1 ? '' : 's'}.`;
+      return `Phone number slots must be unique and within the configured ${slotCount} slot${slotCount === 1 ? '' : 's'}.`;
     }
     seenSlots.add(sim.slotNumber);
     if (sim.phoneNumber !== undefined && sim.phoneNumber !== null && typeof sim.phoneNumber !== 'string') {
       return 'phoneNumber in each SIM slot must be a string or null.';
+    }
+    if (sim.telcoProvider !== undefined && sim.telcoProvider !== null && typeof sim.telcoProvider !== 'string') {
+      return 'telcoProvider in each phone-number slot must be a string or null.';
     }
   }
   return null;
@@ -131,9 +141,9 @@ function validateDevice(input, { requireAll = true } = {}) {
 async function insertSimSlots(client, deviceId, sims) {
   for (const sim of sims) {
     await client.query(
-      `INSERT INTO device_sims (device_id, slot_number, phone_number)
-       VALUES ($1, $2, $3)`,
-      [deviceId, sim.slotNumber, sim.phoneNumber || null],
+      `INSERT INTO device_sims (device_id, slot_number, phone_number, telco_provider)
+       VALUES ($1, $2, $3, $4)`,
+      [deviceId, sim.slotNumber, sim.phoneNumber || null, sim.telcoProvider || null],
     );
   }
 }
@@ -141,7 +151,7 @@ async function insertSimSlots(client, deviceId, sims) {
 async function loadDevicesWithSims(deviceRows) {
   if (!deviceRows.length) return [];
   const simResult = await pool.query(
-    `SELECT device_id, slot_number, phone_number
+    `SELECT device_id, slot_number, phone_number, telco_provider
      FROM device_sims WHERE device_id = ANY($1::bigint[]) ORDER BY slot_number`,
     [deviceRows.map((row) => row.id)],
   );
@@ -151,6 +161,7 @@ async function loadDevicesWithSims(deviceRows) {
     sims.push({
       slotNumber: Number(row.slot_number),
       phoneNumber: row.phone_number,
+      telcoProvider: row.telco_provider,
     });
     simsByDevice.set(Number(row.device_id), sims);
   }
@@ -215,8 +226,8 @@ app.get('/api/activity', async (req, res) => {
 app.get('/api/devices', async (_req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, device_name, attached_pc, anydesk_id, color, telco_provider,
-             sim_slot_count, status, last_seen
+      SELECT id, device_name, attached_pc, anydesk_id, color,
+              sim_slot_count, status, last_seen
       FROM devices
       ORDER BY id
     `);
@@ -251,15 +262,14 @@ app.post('/api/devices/import', async (req, res) => {
     for (const device of devices) {
       const result = await client.query(
         `INSERT INTO devices
-           (device_name, attached_pc, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           (device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id`,
         [
           device.deviceName.trim(),
           device.attachedPc.trim(),
           device.anydeskId?.trim() || null,
           device.color?.trim() || null,
-          device.telcoProvider?.trim() || null,
           device.simSlotCount || 1,
           device.status || 'inactive',
           device.lastSeen || '',
@@ -286,17 +296,17 @@ app.post('/api/devices', async (req, res) => {
   if (simError) return res.status(400).json({ error: simError });
 
   try {
-    const { deviceName, attachedPc, anydeskId, color, telcoProvider, status, lastSeen } = req.body;
+    const { deviceName, attachedPc, anydeskId, color, status, lastSeen } = req.body;
     const client = await pool.connect();
     let result;
     try {
       await client.query('BEGIN');
       result = await client.query(
         `INSERT INTO devices
-           (device_name, attached_pc, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, device_name, attached_pc, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen`,
-        [deviceName.trim(), attachedPc.trim(), anydeskId?.trim() || null, color?.trim() || null, telcoProvider?.trim() || null, req.body.simSlotCount || 1, status || 'inactive', lastSeen || ''],
+           (device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen`,
+        [deviceName.trim(), attachedPc.trim(), anydeskId?.trim() || null, color?.trim() || null, req.body.simSlotCount || 1, status || 'inactive', lastSeen || ''],
       );
       await insertSimSlots(client, result.rows[0].id, normalizeSimSlots(req.body));
       await client.query('COMMIT');
@@ -361,7 +371,7 @@ app.patch('/api/devices/:id', async (req, res) => {
       );
       if (occupied.rowCount) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Move or clear the occupied SIM slot before reducing the slot count.' });
+        return res.status(400).json({ error: 'Move or clear the phone number in the second slot before reducing the slot count.' });
       }
     }
 
@@ -370,13 +380,13 @@ app.patch('/api/devices/:id', async (req, res) => {
       const result = await client.query(
         `UPDATE devices SET ${assignments.join(', ')}, updated_at = now()
          WHERE id = $${keys.length + 1}
-         RETURNING id, device_name, attached_pc, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen`,
+         RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen`,
         [...values, id],
       );
       updatedRow = result.rows[0];
     } else {
       const result = await client.query(
-        `SELECT id, device_name, attached_pc, anydesk_id, color, telco_provider, sim_slot_count, status, last_seen
+        `SELECT id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen
          FROM devices WHERE id = $1`,
         [id],
       );
@@ -408,7 +418,7 @@ app.post('/api/devices/:id/switch-sim', async (req, res) => {
     return res.status(400).json({ error: 'Choose two different, valid assets.' });
   }
   if (![1, 2].includes(sourceSlot) || ![1, 2].includes(targetSlot)) {
-    return res.status(400).json({ error: 'Choose valid source and destination SIM slots.' });
+    return res.status(400).json({ error: 'Choose valid source and destination phone-number slots.' });
   }
 
   const client = await pool.connect();
@@ -427,11 +437,11 @@ app.post('/api/devices/:id/switch-sim', async (req, res) => {
     const target = devices.rows.find((device) => Number(device.id) === targetId);
     if (sourceSlot > Number(source.sim_slot_count) || targetSlot > Number(target.sim_slot_count)) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'The selected slot is not configured for that asset.' });
+      return res.status(400).json({ error: 'The selected phone-number slot is not configured for that asset.' });
     }
 
     const slots = await client.query(
-      `SELECT device_id, slot_number, phone_number
+      `SELECT device_id, slot_number, phone_number, telco_provider
        FROM device_sims
        WHERE (device_id = $1 AND slot_number = $2) OR (device_id = $3 AND slot_number = $4)
        FOR UPDATE`,
@@ -444,7 +454,7 @@ app.post('/api/devices/:id/switch-sim', async (req, res) => {
       return res.status(400).json({ error: `Source slot ${sourceSlot} has no phone number.` });
     }
 
-    const targetPhoneNumber = targetSim?.phone_number ? targetSim : null;
+    const targetPhoneNumber = targetSim?.phone_number || targetSim?.telco_provider ? targetSim : null;
 
     await client.query(
       `DELETE FROM device_sims
@@ -452,15 +462,15 @@ app.post('/api/devices/:id/switch-sim', async (req, res) => {
       [sourceId, sourceSlot, targetId, targetSlot],
     );
     await client.query(
-      `INSERT INTO device_sims (device_id, slot_number, phone_number)
-       VALUES ($1, $2, $3)`,
-      [targetId, targetSlot, sourceSim.phone_number],
+      `INSERT INTO device_sims (device_id, slot_number, phone_number, telco_provider)
+       VALUES ($1, $2, $3, $4)`,
+      [targetId, targetSlot, sourceSim.phone_number, sourceSim.telco_provider],
     );
     if (targetPhoneNumber) {
       await client.query(
-        `INSERT INTO device_sims (device_id, slot_number, phone_number)
-         VALUES ($1, $2, $3)`,
-        [sourceId, sourceSlot, targetPhoneNumber.phone_number],
+        `INSERT INTO device_sims (device_id, slot_number, phone_number, telco_provider)
+         VALUES ($1, $2, $3, $4)`,
+        [sourceId, sourceSlot, targetPhoneNumber.phone_number, targetPhoneNumber.telco_provider],
       );
     }
 
