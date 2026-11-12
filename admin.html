@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Users | SIM & Phone Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell activity-page">
+      <header class="activity-page-header">
+        <div>
+          <p class="activity-eyebrow">SIM & Phone Monitor</p>
+          <h1>Users</h1>
+          <p class="activity-page-description">Create accounts, reset passwords and choose who can manage users.</p>
+        </div>
+        <span class="session-controls">
+          <span>Signed in as <strong id="currentUserName">…</strong></span>
+          <button id="logoutBtn" class="secondary-btn" type="button">Log out</button>
+          <a class="secondary-btn activity-back-link" href="/">Back to inventory</a>
+        </span>
+      </header>
+
+      <p id="appMessage" class="app-message" role="status" hidden></p>
+
+      <section class="panel admin-panel" aria-labelledby="addUserHeading">
+        <div class="table-header">
+          <h2 id="addUserHeading">Add user</h2>
+        </div>
+        <form id="addUserForm" class="add-user-form">
+          <label class="device-form-label">
+            <span>Username</span>
+            <input name="username" type="text" autocomplete="off" autocapitalize="none" pattern="[a-zA-Z0-9._\-]{1,50}" maxlength="50" required />
+          </label>
+          <label class="device-form-label">
+            <span>Password</span>
+            <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="200" required />
+          </label>
+          <label class="admin-checkbox">
+            <input name="isAdmin" type="checkbox" />
+            <span>Admin (can manage users)</span>
+          </label>
+          <button class="primary-btn" type="submit">Add user</button>
+        </form>
+      </section>
+
+      <section class="panel admin-panel" aria-labelledby="usersHeading">
+        <div class="table-header">
+          <h2 id="usersHeading">All users</h2>
+          <span id="usersCount">Loading…</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Last sign-in</th>
+                <th>Created</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <dialog id="resetPasswordDialog" class="switch-dialog">
+        <form id="resetPasswordForm" class="switch-form">
+          <h2>Reset password</h2>
+          <p id="resetPasswordLabel"></p>
+          <label class="device-form-label">
+            <span>New password</span>
+            <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="200" required />
+          </label>
+          <p class="switch-note">They'll be signed out on all devices and must use the new password.</p>
+          <div class="dialog-actions">
+            <button class="secondary-btn" type="button" id="cancelResetPasswordBtn">Cancel</button>
+            <button class="primary-btn" type="submit">Reset password</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+    <script src="session.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>

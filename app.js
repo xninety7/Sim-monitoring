@@ -50,6 +50,7 @@ async function apiRequest(url, options = {}) {
       ...options.headers,
     },
   });
+  if (response.status === 401) window.location.replace('/login.html');
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || `Request failed (${response.status}).`);
@@ -166,8 +167,9 @@ function renderTable() {
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
         </td>
-        <td>${escapeHtml(device.lastSeen || '—')}</td>
+        <td>${renderLastSeen(device)}</td>
         <td>
+          <button class="check-btn" data-id="${device.id}" type="button">Check</button>
           <button class="switch-btn" data-id="${device.id}" type="button" ${hasSimAssignments(device) ? '' : 'disabled'}>Move number</button>
           <button class="edit-btn" data-id="${device.id}" type="button">Edit</button>
           <button class="delete-btn" data-id="${device.id}" type="button">Delete</button>
@@ -185,6 +187,16 @@ function renderPhoneNumbers(device) {
     const provider = sim?.telcoProvider ? ` · ${escapeHtml(sim.telcoProvider)}` : '';
     return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(number)}${provider}</span>`;
   }).join('<br>');
+}
+
+const checkedAtFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+function renderLastSeen(device) {
+  if (!device.lastCheckedAt) return escapeHtml(device.lastSeen || '—');
+  return `
+    <div class="last-seen-user">${escapeHtml(device.lastCheckedBy || 'Unknown user')}</div>
+    <div class="last-seen-time">${escapeHtml(checkedAtFormat.format(new Date(device.lastCheckedAt)))}</div>
+  `;
 }
 
 function hasSimAssignments(device) {
@@ -285,6 +297,20 @@ deviceForm.addEventListener('submit', async (event) => {
 });
 
 tableBody.addEventListener('click', async (event) => {
+  const checkButton = event.target.closest('.check-btn');
+  if (checkButton) {
+    checkButton.disabled = true;
+    try {
+      await apiRequest(`/api/devices/${checkButton.dataset.id}/check`, { method: 'POST' });
+      await loadDevices();
+      showMessage('Asset checked.');
+    } catch (error) {
+      checkButton.disabled = false;
+      showMessage(error.message, true);
+    }
+    return;
+  }
+
   const editButton = event.target.closest('.edit-btn');
   if (editButton) {
     openEditDialog(Number(editButton.dataset.id));
@@ -314,7 +340,7 @@ function openEditDialog(deviceId) {
   if (!device) return;
 
   editDeviceId = deviceId;
-  for (const field of ['deviceName', 'attachedPc', 'anydeskId', 'color', 'simSlotCount', 'status', 'lastSeen']) {
+  for (const field of ['deviceName', 'attachedPc', 'anydeskId', 'color', 'simSlotCount', 'status']) {
     editDeviceForm.elements[field].value = device[field] || (field === 'status' ? 'active' : '');
   }
   for (const slotNumber of [1, 2]) {
@@ -334,7 +360,7 @@ editDeviceForm.addEventListener('submit', async (event) => {
 
   const formData = new FormData(editDeviceForm);
   const updates = Object.fromEntries(
-    ['deviceName', 'attachedPc', 'anydeskId', 'color', 'status', 'lastSeen']
+    ['deviceName', 'attachedPc', 'anydeskId', 'color', 'status']
       .map((field) => [field, String(formData.get(field) || '').trim()]),
   );
   updates.simSlotCount = Number(formData.get('simSlotCount'));

@@ -27,10 +27,11 @@ Phone numbers are stored by asset slot (1 or 2), so an asset can have a separate
 
 ```bash
 npm install
+npm run create-user -- yourname --admin
 npm start
 ```
 
-Open http://localhost:8000.
+Open http://localhost:8000 and sign in with the account you created.
 
 For development with automatic server restart:
 
@@ -54,14 +55,11 @@ The API binds to `127.0.0.1:8000` by default. Put Nginx in front of it; do not e
 - In the ECS security group, allow inbound TCP 80 and 443. Restrict SSH (22) to administrator IPs. Do not allow 8000 or 5432 from the internet.
 - Keep PostgreSQL bound to localhost for a same-instance database.
 
-### 2. Install Nginx and HTTP Basic Auth tooling
+### 2. Install Nginx
 
 ```bash
-sudo dnf install -y nginx httpd-tools
-sudo htpasswd -c /etc/nginx/sim-monitoring.htpasswd team
+sudo dnf install -y nginx
 ```
-
-Choose a unique password at the prompt. This is an interim shared-team access gate; for a larger team, add individual accounts/roles in the application.
 
 ### 3. Install the app as a non-root service
 
@@ -109,7 +107,7 @@ sudo nginx -t
 sudo systemctl enable --now nginx
 ```
 
-Replace `monitor.example.com` with your domain. The Nginx config redirects HTTP to HTTPS, requires the Basic Auth credentials created above, and proxies to the loopback-only Node service. Test `https://YOUR_DOMAIN` in a browser. Keep certificate renewal enabled and test its renewal procedure with your certificate provider.
+Replace `monitor.example.com` with your domain. The Nginx config redirects HTTP to HTTPS and proxies to the loopback-only Node service. Test `https://YOUR_DOMAIN` in a browser. Keep certificate renewal enabled and test its renewal procedure with your certificate provider.
 
 If SELinux is enforcing and Nginx reports a proxy connection error, allow the web server to connect to the local Node port:
 
@@ -118,33 +116,45 @@ sudo setsebool -P httpd_can_network_connect 1
 sudo systemctl reload nginx
 ```
 
-The application currently has no built-in user accounts or role permissions. The Nginx password gate is only a simple interim protection; do not publish the site without HTTPS and access control.
+### 5. Create user accounts
+
+Everyone signs in on the app's login page with their own account. There is no public sign-up. Create the first admin account from the server:
+
+```bash
+sudo bash -c 'set -a; . /etc/sim-monitoring/app.env; cd /opt/sim-monitoring && node scripts/create-user.js yourname --admin'
+```
+
+You'll be asked for the password twice (8 characters minimum). After that, sign in and open **Users** in the dashboard header to add teammates, reset passwords, make or remove admins, and delete accounts. Only admins see the Users page. Admins can't remove their own admin access or delete themselves, so at least one admin always remains.
+
+If every admin is locked out, run the command above again: for an existing username it resets the password (signing them out everywhere), and `--admin` restores admin access.
+
+Sessions last 7 days. After 10 failed sign-ins from one IP address, sign-in is blocked for 15 minutes. Do not publish the site without HTTPS, because the session cookie is only marked secure when served over HTTPS.
 
 ### Activity log and identifying users
 
-The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is read from Nginx's `$remote_user` through the `X-Authenticated-User` proxy header.
+The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is the signed-in user. Clicking **Check** on an asset records the signed-in user and the current date and time in its **Last Seen** column, and is logged as "Checked asset".
 
 For assets with two numbers, set **Phone number slots** to **Two numbers** and fill each slot's phone number and TELCO provider. **Move number** moves the selected source slot to a destination slot; if that destination slot is occupied, the phone number and provider move together as a swap. Changes are transactional and logged with both asset codes and slot numbers.
 
-To identify individual teammates, give each person a distinct Basic Auth username. Add users without `-c` so the existing password file is preserved:
-
-```bash
-sudo htpasswd /etc/nginx/sim-monitoring.htpasswd alice
-sudo htpasswd /etc/nginx/sim-monitoring.htpasswd bob
-```
-
-If everyone signs in using the same username, the log cannot distinguish them. Ensure the active Nginx site config sets `proxy_set_header X-Authenticated-User $remote_user;` in the proxied location, then test and reload Nginx. Restart the app after deploying so it creates the activity-log table through the normal schema initialization.
+Give each teammate their own account so the log can tell them apart. Restart the app after deploying so it creates new tables through the normal schema initialization.
 
 ## API overview
 
 - `GET /api/health` — check API and database connectivity
+- `POST /api/login` — sign in with `username` and `password`; sets the session cookie
+- `POST /api/logout` — end the current session
+- `GET /api/me` — the signed-in user and whether they are an admin
+- `GET /api/users`, `POST /api/users`, `PATCH /api/users/:id`, `DELETE /api/users/:id` — manage accounts (admins only)
 - `GET /api/devices` — read shared device inventory
 - `POST /api/devices` — add a device
 - `PATCH /api/devices/:id` — update supported device fields
 - `DELETE /api/devices/:id` — delete a device
+- `POST /api/devices/:id/check` — record the signed-in user and current time as the asset's last check
 - `POST /api/devices/:id/switch-sim` — move a populated `sourceSlot` phone number to a `targetId`/`targetSlot`; swaps if the destination is occupied
 - `POST /api/devices/import` — import records once into an empty database
 - `GET /api/activity` — retrieve the latest activity events
+
+Every endpoint except health and login requires a signed-in session.
 
 ## Important
 

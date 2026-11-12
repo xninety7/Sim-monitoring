@@ -22,6 +22,7 @@ async function loadActivity(page = 1) {
   activityList.innerHTML = '<li class="activity-empty">Loading activity…</li>';
   try {
     const response = await fetch(`/api/activity?page=${page}`);
+    if (response.status === 401) window.location.replace('/login.html');
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(body.error || `Request failed (${response.status}).`);

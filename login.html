@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in | SIM & Phone Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="panel login-panel" aria-labelledby="loginHeading">
+      <p class="activity-eyebrow">SIM & Phone Monitor</p>
+      <h1 id="loginHeading">Sign in</h1>
+      <form id="loginForm" class="login-form">
+        <label class="device-form-label">
+          <span>Username</span>
+          <input name="username" type="text" autocomplete="username" autocapitalize="none" required autofocus />
+        </label>
+        <label class="device-form-label">
+          <span>Password</span>
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p id="loginMessage" class="app-message error" role="alert" hidden></p>
+        <button class="primary-btn login-submit" type="submit">Sign in</button>
+      </form>
+    </main>
+    <script src="login.js"></script>
+  </body>
+</html>

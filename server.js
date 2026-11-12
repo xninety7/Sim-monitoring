@@ -1,9 +1,18 @@
 import 'dotenv/config';
 import express from 'express';
 import pg from 'pg';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  hashPassword,
+  isValidPassword,
+  isValidUsername,
+  passwordRule,
+  usernameRule,
+  verifyPassword,
+} from './lib/passwords.js';
 
 const { Pool } = pg;
 const app = express();
@@ -36,9 +45,86 @@ const deviceFields = {
   lastSeen: 'last_seen',
 };
 
+const sessionCookie = 'sid';
+const sessionMaxAgeSeconds = 7 * 24 * 60 * 60;
+const publicPaths = new Set(['/login.html', '/login.js', '/styles.css', '/api/login', '/api/health']);
+const loginAttempts = new Map();
+const loginWindowMs = 15 * 60 * 1000;
+const maxLoginFailures = 10;
+const dummyPasswordHash = hashPassword(randomBytes(16).toString('hex'));
+
 app.disable('x-powered-by');
+// Nginx terminates TLS on the same host; trust its X-Forwarded-Proto so secure cookies work.
+app.set('trust proxy', 'loopback');
 app.use(express.json({ limit: '32kb' }));
+app.use(async (req, res, next) => {
+  try {
+    req.user = await findSessionUser(req);
+  } catch (error) {
+    return sendDatabaseError(res, error);
+  }
+  if (req.user && req.path === '/login.html') return res.redirect('/');
+  if (req.user && req.path === '/admin.html' && !req.user.is_admin) return res.redirect('/');
+  if (req.user || publicPaths.has(req.path)) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Please sign in.' });
+  return res.redirect('/login.html');
+});
 app.use(express.static(currentDir, { index: 'index.html' }));
+
+function hashToken(token) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function readSessionToken(req) {
+  const match = new RegExp(`(?:^|;\\s*)${sessionCookie}=([^;]+)`).exec(req.get('Cookie') || '');
+  return match?.[1];
+}
+
+async function findSessionUser(req) {
+  const token = readSessionToken(req);
+  if (!token) return null;
+  const result = await pool.query(
+    `SELECT users.id, users.username, users.is_admin
+     FROM sessions JOIN users ON users.id = sessions.user_id
+     WHERE sessions.token_hash = $1 AND sessions.expires_at > now()`,
+    [hashToken(token)],
+  );
+  return result.rows[0] || null;
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.user?.is_admin) return res.status(403).json({ error: 'Only admins can manage users.' });
+  return next();
+}
+
+function toUser(row) {
+  return {
+    id: Number(row.id),
+    username: row.username,
+    isAdmin: row.is_admin,
+    createdAt: row.created_at,
+    lastLoginAt: row.last_login_at,
+  };
+}
+
+function isLoginBlocked(key) {
+  const attempt = loginAttempts.get(key);
+  if (!attempt) return false;
+  if (Date.now() - attempt.firstAt > loginWindowMs) {
+    loginAttempts.delete(key);
+    return false;
+  }
+  return attempt.count >= maxLoginFailures;
+}
+
+function recordLoginFailure(key) {
+  const attempt = loginAttempts.get(key);
+  if (!attempt || Date.now() - attempt.firstAt > loginWindowMs) {
+    loginAttempts.set(key, { count: 1, firstAt: Date.now() });
+  } else {
+    attempt.count += 1;
+  }
+}
 
 function toDevice(row) {
   return {
@@ -50,6 +136,8 @@ function toDevice(row) {
     simSlotCount: Number(row.sim_slot_count || 1),
     status: row.status,
     lastSeen: row.last_seen,
+    lastCheckedAt: row.last_checked_at,
+    lastCheckedBy: row.last_checked_by,
     sims: row.sims || [],
   };
 }
@@ -179,12 +267,15 @@ function sendDatabaseError(res, error) {
   return res.status(500).json({ error: 'Database request failed.' });
 }
 
+function getActor(req) {
+  return req.user?.username || 'Unknown user';
+}
+
 async function logActivity(req, action, details) {
-  const actor = req.get('X-Authenticated-User')?.trim().slice(0, 100) || 'Unknown user';
   try {
     await pool.query(
       'INSERT INTO activity_log (actor, action, details) VALUES ($1, $2, $3)',
-      [actor, action, details.slice(0, 500)],
+      [getActor(req), action, details.slice(0, 500)],
     );
   } catch (error) {
     console.error('Could not write activity log:', error.message);
@@ -195,6 +286,153 @@ app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', database: 'connected' });
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  if (isLoginBlocked(req.ip)) {
+    return res.status(429).json({ error: 'Too many failed sign-in attempts. Try again in 15 minutes.' });
+  }
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!username || !password || password.length > 200) {
+    return res.status(400).json({ error: 'Enter your username and password.' });
+  }
+
+  try {
+    const result = await pool.query('SELECT id, username, password_hash FROM users WHERE username = $1', [username]);
+    const user = result.rows[0];
+    // Verify against a dummy hash for unknown users so response time doesn't reveal which usernames exist.
+    const passwordMatches = await verifyPassword(password, user?.password_hash ?? await dummyPasswordHash);
+    if (!user || !passwordMatches) {
+      recordLoginFailure(req.ip);
+      return res.status(401).json({ error: 'Incorrect username or password.' });
+    }
+
+    loginAttempts.delete(req.ip);
+    const token = randomBytes(32).toString('base64url');
+    await pool.query('DELETE FROM sessions WHERE expires_at <= now()');
+    await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
+    await pool.query(
+      `INSERT INTO sessions (token_hash, user_id, expires_at)
+       VALUES ($1, $2, now() + make_interval(secs => $3))`,
+      [hashToken(token), user.id, sessionMaxAgeSeconds],
+    );
+    res.cookie(sessionCookie, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure,
+      maxAge: sessionMaxAgeSeconds * 1000,
+      path: '/',
+    });
+    res.json({ username: user.username });
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.post('/api/logout', async (req, res) => {
+  const token = readSessionToken(req);
+  try {
+    if (token) await pool.query('DELETE FROM sessions WHERE token_hash = $1', [hashToken(token)]);
+    res.clearCookie(sessionCookie, { path: '/' });
+    res.status(204).end();
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.get('/api/me', (req, res) => {
+  res.json({ username: req.user.username, isAdmin: req.user.is_admin });
+});
+
+app.get('/api/users', requireAdmin, async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, username, is_admin, created_at, last_login_at FROM users ORDER BY username',
+    );
+    res.json(result.rows.map(toUser));
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.post('/api/users', requireAdmin, async (req, res) => {
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  const { password, isAdmin = false } = req.body ?? {};
+  if (!isValidUsername(username)) return res.status(400).json({ error: usernameRule });
+  if (!isValidPassword(password)) return res.status(400).json({ error: passwordRule });
+  if (typeof isAdmin !== 'boolean') return res.status(400).json({ error: 'isAdmin must be true or false.' });
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO users (username, password_hash, is_admin) VALUES ($1, $2, $3)
+       ON CONFLICT (username) DO NOTHING
+       RETURNING id, username, is_admin, created_at, last_login_at`,
+      [username, await hashPassword(password), isAdmin],
+    );
+    if (!result.rowCount) return res.status(409).json({ error: 'That username is already taken.' });
+    await logActivity(req, 'Created user', `${username}${isAdmin ? ' (admin)' : ''}`);
+    res.status(201).json(toUser(result.rows[0]));
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.patch('/api/users/:id', requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid user id.' });
+  const { password, isAdmin } = req.body ?? {};
+  if (password === undefined && isAdmin === undefined) {
+    return res.status(400).json({ error: 'Provide a new password or admin setting.' });
+  }
+  if (password !== undefined && !isValidPassword(password)) return res.status(400).json({ error: passwordRule });
+  if (isAdmin !== undefined && typeof isAdmin !== 'boolean') {
+    return res.status(400).json({ error: 'isAdmin must be true or false.' });
+  }
+  // Admins can't demote themselves, so there is always at least one admin left.
+  if (isAdmin === false && id === Number(req.user.id)) {
+    return res.status(400).json({ error: "You can't remove your own admin access." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET password_hash = COALESCE($2, password_hash), is_admin = COALESCE($3, is_admin)
+       WHERE id = $1
+       RETURNING id, username, is_admin, created_at, last_login_at`,
+      [id, password === undefined ? null : await hashPassword(password), isAdmin ?? null],
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'User not found.' });
+    const changes = [];
+    if (password !== undefined) {
+      // Sign the user out everywhere, except the admin's own current session.
+      await pool.query(
+        'DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2',
+        [id, hashToken(readSessionToken(req))],
+      );
+      changes.push('password reset');
+    }
+    if (isAdmin !== undefined) changes.push(isAdmin ? 'made admin' : 'admin access removed');
+    await logActivity(req, 'Updated user', `${result.rows[0].username}: ${changes.join(', ')}`);
+    res.json(toUser(result.rows[0]));
+  } catch (error) {
+    sendDatabaseError(res, error);
+  }
+});
+
+app.delete('/api/users/:id', requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid user id.' });
+  if (id === Number(req.user.id)) return res.status(400).json({ error: "You can't delete your own account." });
+
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING username', [id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'User not found.' });
+    await logActivity(req, 'Deleted user', result.rows[0].username);
+    res.status(204).end();
   } catch (error) {
     sendDatabaseError(res, error);
   }
@@ -227,7 +465,7 @@ app.get('/api/devices', async (_req, res) => {
   try {
     const result = await pool.query(`
       SELECT id, device_name, attached_pc, anydesk_id, color,
-              sim_slot_count, status, last_seen
+              sim_slot_count, status, last_seen, last_checked_at, last_checked_by
       FROM devices
       ORDER BY id
     `);
@@ -305,7 +543,7 @@ app.post('/api/devices', async (req, res) => {
         `INSERT INTO devices
            (device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen`,
+         RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen, last_checked_at, last_checked_by`,
         [deviceName.trim(), attachedPc.trim(), anydeskId?.trim() || null, color?.trim() || null, req.body.simSlotCount || 1, status || 'inactive', lastSeen || ''],
       );
       await insertSimSlots(client, result.rows[0].id, normalizeSimSlots(req.body));
@@ -380,13 +618,13 @@ app.patch('/api/devices/:id', async (req, res) => {
       const result = await client.query(
         `UPDATE devices SET ${assignments.join(', ')}, updated_at = now()
          WHERE id = $${keys.length + 1}
-         RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen`,
+         RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen, last_checked_at, last_checked_by`,
         [...values, id],
       );
       updatedRow = result.rows[0];
     } else {
       const result = await client.query(
-        `SELECT id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen
+        `SELECT id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen, last_checked_at, last_checked_by
          FROM devices WHERE id = $1`,
         [id],
       );
@@ -406,6 +644,26 @@ app.patch('/api/devices/:id', async (req, res) => {
     sendDatabaseError(res, error);
   } finally {
     client.release();
+  }
+});
+
+app.post('/api/devices/:id/check', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid device id.' });
+
+  try {
+    const result = await pool.query(
+      `UPDATE devices SET last_checked_at = now(), last_checked_by = $1
+       WHERE id = $2
+       RETURNING id, device_name, attached_pc, anydesk_id, color, sim_slot_count, status, last_seen, last_checked_at, last_checked_by`,
+      [getActor(req), id],
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'Device not found.' });
+    await logActivity(req, 'Checked asset', result.rows[0].device_name);
+    const [device] = await loadDevicesWithSims(result.rows);
+    res.json(device);
+  } catch (error) {
+    sendDatabaseError(res, error);
   }
 });
 

@@ -35,6 +35,11 @@
           </section>
           <button id="toggleDeviceFormBtn" class="primary-btn add-device-toggle" type="button" aria-haspopup="dialog" aria-controls="addDeviceDialog">Add device</button>
           <a class="secondary-btn activity-link" href="activity.html">Recent activity</a>
+          <a id="adminLink" class="secondary-btn activity-link" href="admin.html" hidden>Users</a>
+          <span class="session-controls">
+            <span>Signed in as <strong id="currentUserName">…</strong></span>
+            <button id="logoutBtn" class="secondary-btn" type="button">Log out</button>
+          </span>
         </div>
       </header>
 
@@ -190,10 +195,6 @@
                 <option value="suspended">Suspended</option>
               </select>
             </label>
-            <label class="device-form-label">
-              <span>Last seen</span>
-              <input name="lastSeen" type="text" />
-            </label>
           </div>
           <div class="dialog-actions">
             <button class="secondary-btn" type="button" id="cancelEditDeviceBtn">Cancel</button>
@@ -227,6 +228,7 @@
       </dialog>
     </div>
 
+    <script src="session.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -14,7 +14,12 @@
           <h1>Recent activity</h1>
           <p class="activity-page-description">A history of changes made to the shared inventory.</p>
         </div>
-        <a class="secondary-btn activity-back-link" href="/">Back to inventory</a>
+        <span class="session-controls">
+          <span>Signed in as <strong id="currentUserName">…</strong></span>
+          <button id="logoutBtn" class="secondary-btn" type="button">Log out</button>
+          <a id="adminLink" class="secondary-btn activity-back-link" href="admin.html" hidden>Users</a>
+          <a class="secondary-btn activity-back-link" href="/">Back to inventory</a>
+        </span>
       </header>
 
       <main class="panel activity-log-panel" aria-labelledby="activityHeading">
@@ -32,6 +37,7 @@
         </nav>
       </main>
     </div>
+    <script src="session.js"></script>
     <script src="activity.js"></script>
   </body>
 </html>
