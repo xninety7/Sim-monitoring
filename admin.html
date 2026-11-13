@@ -13,7 +13,7 @@
         <div>
           <p class="activity-eyebrow">SIM & Phone Monitor</p>
           <h1>Users</h1>
-          <p class="activity-page-description">Create accounts, reset passwords and choose who can manage users.</p>
+          <p class="activity-page-description">Manage accounts, the Mac agents that watch the phones, and which phone belongs to which asset.</p>
         </div>
         <span class="session-controls">
           <a class="secondary-btn activity-back-link" href="/">Back to inventory</a>
@@ -61,6 +61,62 @@
               </tr>
             </thead>
             <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel admin-panel" aria-labelledby="phonesHeading">
+        <div class="table-header">
+          <h2 id="phonesHeading">Monitored phones</h2>
+          <span id="phonesCount">Loading…</span>
+        </div>
+        <p class="admin-help">Phones appear here automatically once a Mac agent sees them. Link each one to its asset so its SIM status shows on the dashboard.</p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Phone</th>
+                <th>Mac</th>
+                <th>Connection</th>
+                <th>SIMs</th>
+                <th>Asset</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="phonesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel admin-panel" aria-labelledby="agentsHeading">
+        <div class="table-header">
+          <h2 id="agentsHeading">Mac agents</h2>
+          <span id="agentsCount">Loading…</span>
+        </div>
+        <p class="admin-help">Each office Mac needs its own agent key. Create one here, then paste it into that Mac's agent settings.</p>
+        <form id="addAgentForm" class="add-user-form add-agent-form">
+          <label class="device-form-label">
+            <span>Mac name</span>
+            <input name="name" type="text" maxlength="50" placeholder="e.g. PC-9" required />
+          </label>
+          <button class="primary-btn" type="submit">Create agent key</button>
+        </form>
+        <div id="newAgentKey" class="new-agent-key" hidden>
+          <p><strong>Agent key for <span id="newAgentName"></span></strong>. Copy it now; it won't be shown again.</p>
+          <code id="newAgentToken"></code>
+          <button id="copyAgentTokenBtn" class="secondary-btn" type="button">Copy key</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Mac</th>
+                <th>Last report</th>
+                <th>Phones connected</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="agentsTableBody"></tbody>
           </table>
         </div>
       </section>

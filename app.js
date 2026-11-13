@@ -76,7 +76,7 @@ async function loadDevices() {
     importLocalBtn.hidden = true;
     showMessage(`Could not load shared devices: ${error.message}`, true);
     resultsCount.textContent = 'Database unavailable';
-    tableBody.innerHTML = '<tr><td colspan="9" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="10" class="empty-state">Connect to the configured PostgreSQL database to load devices.</td></tr>';
   }
 }
 
@@ -143,7 +143,7 @@ function renderTable() {
   if (!filtered.length) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="9" class="empty-state">No matching devices found.</td>
+        <td colspan="10" class="empty-state">No matching devices found.</td>
       </tr>
     `;
     return;
@@ -167,6 +167,7 @@ function renderTable() {
         <td>
           <span class="status-pill status-${escapeHtml(device.status)}">${escapeHtml(device.status)}</span>
         </td>
+        <td>${renderPhoneMonitor(device)}</td>
         <td>${renderLastSeen(device)}</td>
         <td>
           <button class="check-btn" data-id="${device.id}" type="button">Check</button>
@@ -180,13 +181,44 @@ function renderTable() {
 }
 
 function renderPhoneNumbers(device) {
-  return Array.from({ length: device.simSlotCount || 1 }, (_, index) => {
+  // Also show slots the phone reports beyond the asset's configured slot count.
+  const monitoredSlots = device.monitor?.slots.map((slot) => slot.slotNumber) || [];
+  const slotCount = Math.max(device.simSlotCount || 1, ...monitoredSlots);
+  return Array.from({ length: slotCount }, (_, index) => {
     const slotNumber = index + 1;
     const sim = device.sims?.find((assignment) => assignment.slotNumber === slotNumber);
     const number = sim?.phoneNumber || 'Empty';
     const provider = sim?.telcoProvider ? ` · ${escapeHtml(sim.telcoProvider)}` : '';
-    return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(number)}${provider}</span>`;
+    const monitor = renderSimMonitor(device, slotNumber);
+    return `<span><strong>Slot ${slotNumber}:</strong> ${escapeHtml(number)}${provider}</span>${monitor ? `<br>${monitor}` : ''}`;
   }).join('<br>');
+}
+
+function renderSimMonitor(device, slotNumber) {
+  const slot = device.monitor?.slots.find((item) => item.slotNumber === slotNumber);
+  if (!slot || slot.state === 'empty') return '';
+  const accept = `<button class="accept-sim-btn" data-phone-id="${device.monitor.id}" data-slot="${slotNumber}" type="button">Accept</button>`;
+  if (slot.state === 'present') {
+    return `<span class="sim-badge sim-ok" title="Detected on the phone">✓ ${escapeHtml(slot.simLabel || 'SIM in phone')}</span>`;
+  }
+  if (slot.state === 'removed') {
+    return `<span class="sim-badge sim-alert">⚠ SIM removed${slot.expectedSimLabel ? ` (was ${escapeHtml(slot.expectedSimLabel)})` : ''}</span>${accept}`;
+  }
+  return `<span class="sim-badge sim-alert">⚠ SIM changed: ${escapeHtml(slot.expectedSimLabel || 'expected SIM')} → ${escapeHtml(slot.simLabel || 'unknown SIM')}</span>${accept}`;
+}
+
+const phoneSeenFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+function renderPhoneMonitor(device) {
+  const monitor = device.monitor;
+  if (!monitor) return '<span class="monitor-none">Not monitored</span>';
+  const where = monitor.agentName ? `<div class="monitor-detail">${escapeHtml(monitor.agentName)}</div>` : '';
+  if (monitor.connected && monitor.problem) {
+    return `<span class="monitor-state monitor-warn">⚠ Needs attention</span><div class="monitor-detail">${escapeHtml(monitor.problem)}</div>`;
+  }
+  if (monitor.connected) return `<span class="monitor-state monitor-on">● Connected</span>${where}`;
+  const since = monitor.lastSeenAt ? `<div class="monitor-detail">Last seen ${escapeHtml(phoneSeenFormat.format(new Date(monitor.lastSeenAt)))}</div>` : '';
+  return `<span class="monitor-state monitor-off">○ Offline</span>${since}`;
 }
 
 const checkedAtFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -297,6 +329,20 @@ deviceForm.addEventListener('submit', async (event) => {
 });
 
 tableBody.addEventListener('click', async (event) => {
+  const acceptButton = event.target.closest('.accept-sim-btn');
+  if (acceptButton) {
+    acceptButton.disabled = true;
+    try {
+      await apiRequest(`/api/phones/${acceptButton.dataset.phoneId}/slots/${acceptButton.dataset.slot}/accept`, { method: 'POST' });
+      await loadDevices();
+      showMessage('SIM change accepted.');
+    } catch (error) {
+      acceptButton.disabled = false;
+      showMessage(error.message, true);
+    }
+    return;
+  }
+
   const checkButton = event.target.closest('.check-btn');
   if (checkButton) {
     checkButton.disabled = true;

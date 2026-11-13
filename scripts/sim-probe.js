@@ -79,11 +79,12 @@ async function probeAndroid() {
       line(`Slot ${index + 1} carrier`, carriers[index]);
     });
 
-    // The SIM serial (ICCID) is what makes same-carrier swaps detectable; newer Android may block it.
+    // A SIM identity is what makes same-carrier swaps detectable. The siminfo table gives the full ICCID
+    // on older Android; newer versions block it, so fall back to the subscription service dump.
     const simInfo = await tool('adb', ['-s', serial, 'shell', 'content', 'query', '--uri', 'content://telephony/siminfo']);
     const rows = simInfo.ok ? simInfo.out.split('\n').filter((row) => row.startsWith('Row:')) : [];
     if (!rows.length) {
-      line('SIM serial (ICCID)', `not readable${simInfo.ok ? '' : ` (${simInfo.out.split('\n')[0].slice(0, 100)})`}`);
+      await probeAndroidSubscriptions(serial);
       continue;
     }
     for (const row of rows) {
@@ -94,6 +95,30 @@ async function probeAndroid() {
       line(`SIM (${where})`, `ICCID ${mask(field('icc_id')) || '—'}, carrier ${field('carrier_name') || '—'}, number ${field('number') || '—'}`);
     }
   }
+}
+
+// Android gives each physical SIM it has ever seen its own subscription id, keyed by the full ICCID.
+// A slot whose id changes therefore holds a different SIM, even from the same carrier.
+async function probeAndroidSubscriptions(serial) {
+  const dump = await tool('adb', ['-s', serial, 'shell', 'dumpsys', 'isub']);
+  const records = new Map();
+  for (const row of (dump.out || '').split('\n')) {
+    const match = row.match(/SubscriptionInfoInternal: id=(\d+) iccId=(\S*) simSlotIndex=(-?\d+)/);
+    if (!match) continue;
+    // carrierName can contain spaces, so it runs until the next " key=" pair.
+    const carrier = row.match(/ carrierName=(.*?)(?= \w+=|$)/)?.[1];
+    records.set(match[1], { iccid: match[2], slot: Number(match[3]), carrier });
+  }
+  if (!records.size) {
+    line('SIM identity', `not readable${dump.ok ? '' : ` (${dump.out.split('\n')[0].slice(0, 100)})`}`);
+    return;
+  }
+  const inserted = [...records.entries()].filter(([, sim]) => sim.slot >= 0).sort((a, b) => a[1].slot - b[1].slot);
+  for (const [id, sim] of inserted) {
+    line(`Slot ${sim.slot + 1} SIM`, `SIM #${id} (ICCID starts ${sim.iccid.replace(/\[\*+\]$/, '…')}), carrier ${sim.carrier}`);
+  }
+  const past = [...records.keys()].filter((id) => records.get(id).slot < 0);
+  line('Previously seen SIMs', past.length ? past.map((id) => `#${id}`).join(', ') : 'none');
 }
 
 async function probeIphone() {

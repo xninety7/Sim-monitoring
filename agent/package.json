@@ -1,0 +1,6 @@
+{
+  "name": "sim-monitoring-agent",
+  "private": true,
+  "type": "module",
+  "description": "Reports SIM status of USB-connected phones to the SIM Monitoring dashboard"
+}

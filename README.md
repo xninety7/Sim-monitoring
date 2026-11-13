@@ -140,6 +140,38 @@ Give each teammate their own account so the log can tell them apart.
 
 Open pages update live: when anyone adds, edits, checks, moves or deletes something, every signed-in browser refreshes its data within a second or two. The **● Live** marker next to the signed-in user shows the connection is active. This uses Server-Sent Events on `/api/events`; the app sends `X-Accel-Buffering: no`, so the Nginx config needs no changes. Restart the app after deploying so it creates new tables through the normal schema initialization.
 
+## Automatic SIM monitoring
+
+A small agent on each office Mac checks the phones plugged into it every 30 seconds and reports to the dashboard. For each linked asset, the dashboard then shows whether the phone is **connected**, and for each SIM slot whether the SIM is **present**, **removed** or **changed** (swapped for a different SIM, even from the same carrier). Changes appear live and are recorded in Recent activity. A phone is marked offline about 90 seconds after its Mac stops reporting.
+
+| | Android | iPhone |
+|---|---|---|
+| SIM removed / swapped / present | ✅ (via Android's per-SIM subscription id) | ✅ (via the SIM serial) |
+| Phone number read automatically | ❌ | ✅ |
+| One-time setup on the phone | Turn on USB debugging and tap **Allow** | Tap **Trust This Computer** |
+
+Only a hash of each SIM serial leaves the Mac.
+
+### Set up a Mac
+
+1. On the dashboard, open **Users** → **Mac agents**, enter the Mac's name (e.g. `PC-9`) and click **Create agent key**. Copy the key; it is shown only once.
+2. On that Mac, install the requirements and run the installer from the `agent/` folder of this repository:
+
+   ```bash
+   brew install node android-platform-tools libimobiledevice
+   cd agent && ./install.sh
+   ```
+
+   Paste the agent key when asked. The installer sends a test report, then sets the agent to run in the background and start at login. Its log is `~/Library/Logs/sim-agent.log`.
+3. Plug in each phone and complete the phone's one-time setup (table above).
+4. Back on **Users** → **Monitored phones**, pick the asset for each phone that appears.
+
+Keep the Macs awake and signed in (System Settings → Energy → **Prevent automatic sleeping when the display is off**); a sleeping Mac makes its phones show as offline.
+
+When a slot shows ⚠ **SIM changed** or ⚠ **SIM removed** and the change was intentional, click **Accept** on the dashboard to make it the new expected state. To check what a Mac can see without sending anything, run `node agent/sim-agent.js --dry-run` (or `node scripts/sim-probe.js` for more detail).
+
+To stop the agent on a Mac: `launchctl bootout gui/$(id -u)/me.bewen.sim-agent`. To stop a Mac from reporting, revoke its key on the Users page.
+
 ## API overview
 
 - `GET /api/health` — check API and database connectivity
@@ -156,8 +188,13 @@ Open pages update live: when anyone adds, edits, checks, moves or deletes someth
 - `POST /api/devices/import` — import records once into an empty database
 - `GET /api/activity` — retrieve the latest activity events
 - `GET /api/events` — live stream that announces each change (Server-Sent Events)
+- `POST /api/agent/report` — agent report of connected phones and SIMs (authenticated with an agent key, not a session)
+- `GET /api/phones` — monitored phones and their SIM states
+- `PATCH /api/phones/:id`, `DELETE /api/phones/:id` — link a phone to an asset, or remove it (admins only)
+- `POST /api/phones/:id/slots/:slot/accept` — accept a SIM change or removal as the new expected state
+- `GET /api/agents`, `POST /api/agents`, `DELETE /api/agents/:id` — manage Mac agent keys (admins only)
 
-Every endpoint except health and login requires a signed-in session.
+Every endpoint except health, login and the agent report requires a signed-in session.
 
 ## Important
 

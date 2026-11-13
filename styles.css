@@ -838,3 +838,102 @@ tbody tr:hover {
 .live-status.offline {
   color: var(--muted);
 }
+
+.sim-badge {
+  display: inline-block;
+  margin: 3px 0 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 700 0.74rem/1.5 "Segoe UI", Arial, sans-serif;
+}
+
+.sim-ok {
+  background: rgba(24, 169, 87, 0.1);
+  color: #12804a;
+}
+
+.sim-alert {
+  background: rgba(231, 76, 60, 0.12);
+  color: #b42318;
+}
+
+.accept-sim-btn {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border: 1px solid rgba(180, 35, 24, 0.25);
+  border-radius: 7px;
+  background: #fff;
+  color: #b42318;
+  font: 700 0.74rem/1.5 "Segoe UI", Arial, sans-serif;
+  cursor: pointer;
+}
+
+.accept-sim-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.monitor-state {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.monitor-on {
+  color: #12804a;
+}
+
+.monitor-off {
+  color: #b42318;
+}
+
+.monitor-warn {
+  color: #b26a00;
+}
+
+.monitor-none,
+.monitor-detail {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.admin-help {
+  padding: 14px 20px 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.add-agent-form {
+  grid-template-columns: minmax(180px, 320px) auto;
+  justify-content: start;
+}
+
+.new-agent-key {
+  margin: 0 20px 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(24, 169, 87, 0.25);
+  border-radius: 12px;
+  background: rgba(24, 169, 87, 0.06);
+}
+
+.new-agent-key[hidden] {
+  display: none;
+}
+
+.new-agent-key code {
+  display: block;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+  font: 0.85rem/1.4 ui-monospace, Menlo, monospace;
+  word-break: break-all;
+}
+
+.link-asset-select {
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+}

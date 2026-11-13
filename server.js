@@ -13,6 +13,7 @@ import {
   usernameRule,
   verifyPassword,
 } from './lib/passwords.js';
+import { registerMonitoring } from './lib/monitoring.js';
 
 const { Pool } = pg;
 const app = express();
@@ -47,7 +48,8 @@ const deviceFields = {
 
 const sessionCookie = 'sid';
 const sessionMaxAgeSeconds = 7 * 24 * 60 * 60;
-const publicPaths = new Set(['/login.html', '/login.js', '/styles.css', '/api/login', '/api/health']);
+// /api/agent/report authenticates with its own agent key instead of a session.
+const publicPaths = new Set(['/login.html', '/login.js', '/styles.css', '/api/login', '/api/health', '/api/agent/report']);
 const loginAttempts = new Map();
 const loginWindowMs = 15 * 60 * 1000;
 const maxLoginFailures = 10;
@@ -271,7 +273,7 @@ function sendDatabaseError(res, error) {
 }
 
 function getActor(req) {
-  return req.user?.username || 'Unknown user';
+  return req.actorName || req.user?.username || 'Unknown user';
 }
 
 // Every successful change is logged here, so this is also where open pages get told to refresh.
@@ -359,6 +361,8 @@ app.post('/api/logout', async (req, res) => {
 app.get('/api/me', (req, res) => {
   res.json({ username: req.user.username, isAdmin: req.user.is_admin });
 });
+
+const monitoring = registerMonitoring(app, { pool, logActivity, requireAdmin, sendDatabaseError, hashToken });
 
 app.get('/api/events', (req, res) => {
   res.set({
@@ -511,7 +515,11 @@ app.get('/api/devices', async (_req, res) => {
       FROM devices
       ORDER BY id
     `);
-    res.json(await loadDevicesWithSims(result.rows));
+    const [devices, monitors] = await Promise.all([
+      loadDevicesWithSims(result.rows),
+      monitoring.loadMonitorsByDevice(result.rows.map((row) => row.id)),
+    ]);
+    res.json(devices.map((device) => ({ ...device, monitor: monitors.get(device.id) || null })));
   } catch (error) {
     sendDatabaseError(res, error);
   }
@@ -841,6 +849,7 @@ async function initializeDatabase() {
 
 async function start() {
   await initializeDatabase();
+  monitoring.startOfflineSweep();
   app.listen(port, host, () => {
     console.log(`SIM Monitoring dashboard and API listening on http://${host}:${port}`);
   });
