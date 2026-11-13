@@ -136,7 +136,9 @@ The dashboard records successful device additions, edits, deletions, phone-numbe
 
 For assets with two numbers, set **Phone number slots** to **Two numbers** and fill each slot's phone number and TELCO provider. **Move number** moves the selected source slot to a destination slot; if that destination slot is occupied, the phone number and provider move together as a swap. Changes are transactional and logged with both asset codes and slot numbers.
 
-Give each teammate their own account so the log can tell them apart. Restart the app after deploying so it creates new tables through the normal schema initialization.
+Give each teammate their own account so the log can tell them apart.
+
+Open pages update live: when anyone adds, edits, checks, moves or deletes something, every signed-in browser refreshes its data within a second or two. The **● Live** marker next to the signed-in user shows the connection is active. This uses Server-Sent Events on `/api/events`; the app sends `X-Accel-Buffering: no`, so the Nginx config needs no changes. Restart the app after deploying so it creates new tables through the normal schema initialization.
 
 ## API overview
 
@@ -153,6 +155,7 @@ Give each teammate their own account so the log can tell them apart. Restart the
 - `POST /api/devices/:id/switch-sim` — move a populated `sourceSlot` phone number to a `targetId`/`targetSlot`; swaps if the destination is occupied
 - `POST /api/devices/import` — import records once into an empty database
 - `GET /api/activity` — retrieve the latest activity events
+- `GET /api/events` — live stream that announces each change (Server-Sent Events)
 
 Every endpoint except health and login requires a signed-in session.
 

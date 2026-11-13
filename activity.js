@@ -18,8 +18,8 @@ function escapeHtml(value) {
   })[character]);
 }
 
-async function loadActivity(page = 1) {
-  activityList.innerHTML = '<li class="activity-empty">Loading activity…</li>';
+async function loadActivity(page = 1, { quiet = false } = {}) {
+  if (!quiet) activityList.innerHTML = '<li class="activity-empty">Loading activity…</li>';
   try {
     const response = await fetch(`/api/activity?page=${page}`);
     if (response.status === 401) window.location.replace('/login.html');
@@ -63,5 +63,7 @@ activityPreviousBtn.addEventListener('click', () => {
 activityNextBtn.addEventListener('click', () => {
   if (currentPage < pageCount) loadActivity(currentPage + 1);
 });
+
+window.addEventListener('live-change', () => loadActivity(currentPage, { quiet: true }));
 
 loadActivity();

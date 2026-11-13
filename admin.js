@@ -153,4 +153,6 @@ resetPasswordForm.addEventListener('submit', async (event) => {
   }
 });
 
+window.addEventListener('live-change', loadUsers);
+
 loadUsers();

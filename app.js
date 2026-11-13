@@ -466,4 +466,14 @@ switchSimForm.addEventListener('submit', async (event) => {
   }
 });
 
+// Refresh quietly on live updates so messages from the user's own actions stay visible.
+window.addEventListener('live-change', async () => {
+  try {
+    allDevices = await apiRequest('/api/devices');
+    renderTable();
+  } catch {
+    // The next live update or manual action will retry.
+  }
+});
+
 loadDevices();

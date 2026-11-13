@@ -52,6 +52,9 @@ const loginAttempts = new Map();
 const loginWindowMs = 15 * 60 * 1000;
 const maxLoginFailures = 10;
 const dummyPasswordHash = hashPassword(randomBytes(16).toString('hex'));
+const liveClients = new Set();
+// Below Nginx's 30s proxy_read_timeout so idle live connections stay open.
+const liveKeepAliveMs = 25_000;
 
 app.disable('x-powered-by');
 // Nginx terminates TLS on the same host; trust its X-Forwarded-Proto so secure cookies work.
@@ -271,6 +274,7 @@ function getActor(req) {
   return req.user?.username || 'Unknown user';
 }
 
+// Every successful change is logged here, so this is also where open pages get told to refresh.
 async function logActivity(req, action, details) {
   try {
     await pool.query(
@@ -279,6 +283,14 @@ async function logActivity(req, action, details) {
     );
   } catch (error) {
     console.error('Could not write activity log:', error.message);
+  }
+  broadcastChange(action);
+}
+
+function broadcastChange(action) {
+  const message = `event: change\ndata: ${JSON.stringify({ action })}\n\n`;
+  for (const res of liveClients) {
+    if (!res.writableEnded) res.write(message);
   }
 }
 
@@ -346,6 +358,36 @@ app.post('/api/logout', async (req, res) => {
 
 app.get('/api/me', (req, res) => {
   res.json({ username: req.user.username, isAdmin: req.user.is_admin });
+});
+
+app.get('/api/events', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+  res.write('retry: 5000\n\n');
+  liveClients.add(res);
+
+  // Also end the stream once the session is gone (logout, account deleted, expiry).
+  const keepAlive = setInterval(async () => {
+    try {
+      if (!(await findSessionUser(req))) {
+        if (!res.writableEnded) res.end();
+        return;
+      }
+    } catch {
+      // Keep the stream open through a brief database error.
+    }
+    if (!res.writableEnded) res.write(': keep-alive\n\n');
+  }, liveKeepAliveMs);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    liveClients.delete(res);
+  });
 });
 
 app.get('/api/users', requireAdmin, async (_req, res) => {
