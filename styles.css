@@ -621,7 +621,13 @@ h2 {
   align-items: center;
   gap: 10px;
   white-space: nowrap;
+}
+
+.signed-in-as {
+  margin: -16px 0 8px;
+  text-align: right;
   color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .activity-log-panel {
