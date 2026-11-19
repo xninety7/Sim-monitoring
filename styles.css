@@ -937,3 +937,11 @@ tbody tr:hover {
   background: #fff;
   font: inherit;
 }
+
+.monitoring-panel {
+  margin-top: 20px;
+}
+
+#monitoringAdmin[hidden] {
+  display: none;
+}

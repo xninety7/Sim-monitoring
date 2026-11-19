@@ -50,7 +50,8 @@ async function reportOnce() {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || `Dashboard returned ${response.status}`);
+    const hint = response.status === 401 && !body.error ? ' (Nginx password prompt still on?)' : '';
+    throw new Error(body.error || `Dashboard returned ${response.status}${hint}`);
   }
   // Log only when something changes, so the log stays small.
   const summary = [summarize(phones), ...warnings].join(' | ');
@@ -63,8 +64,11 @@ async function loop() {
   try {
     await reportOnce();
   } catch (error) {
-    if (error.message !== lastError) log(`Report failed: ${error.message}`);
-    lastError = error.message;
+    // fetch hides the network reason (timeout, refused, DNS) in error.cause.
+    const reason = error.cause?.code || error.cause?.message;
+    const message = reason ? `${error.message} (${reason})` : error.message;
+    if (message !== lastError) log(`Report failed: ${message}`);
+    lastError = message;
     if (once) process.exitCode = 1;
   }
   if (!once && !dryRun) setTimeout(loop, intervalMs);

@@ -32,8 +32,18 @@ mkdir -p "$DEST" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 cp sim-agent.js phone-reader.js package.json "$DEST/"
 
 echo "Sending a test report to $URL ..."
-if ! SIM_AGENT_URL="$URL" SIM_AGENT_TOKEN="$TOKEN" PATH="$TOOL_PATH" node "$DEST/sim-agent.js" --once; then
-  echo "The test report failed. Check the agent key and the internet connection."
+REPORTED=0
+for attempt in 1 2 3; do
+  if SIM_AGENT_URL="$URL" SIM_AGENT_TOKEN="$TOKEN" PATH="$TOOL_PATH" node "$DEST/sim-agent.js" --once; then
+    REPORTED=1
+    break
+  fi
+  [ "$attempt" -lt 3 ] && echo "Retrying ($attempt of 3 failed) ..."
+done
+if [ "$REPORTED" -ne 1 ]; then
+  echo "The test report failed 3 times. See the error above:"
+  echo "  401 / 'Unknown agent key': check the key, and that Nginx's password prompt (auth_basic) is removed."
+  echo "  'fetch failed' / timeout: this Mac can't reach the server; check the firewall or network."
   exit 1
 fi
 
