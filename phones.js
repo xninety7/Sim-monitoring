@@ -62,6 +62,23 @@ function renderSlot(phone, slot) {
   return `${label} <span class="sim-badge sim-alert">⚠ SIM changed: ${escapeHtml(slot.expectedSimLabel || 'expected SIM')} → ${escapeHtml(slot.simLabel || 'unknown SIM')}</span>${accept}`;
 }
 
+// One connection line per SIM slot, lined up with the SIMs column, so each SIM's status is visible.
+const slotConnection = {
+  present: '<span class="monitor-state monitor-on">● Connected</span>',
+  changed: '<span class="monitor-state monitor-warn">● Different SIM</span>',
+  removed: '<span class="monitor-state monitor-off">○ SIM removed</span>',
+  empty: '<span class="monitor-state monitor-none">○ No SIM</span>',
+};
+
+function renderConnection(phone) {
+  if (!phone.connected) {
+    return `<span class="monitor-state monitor-off">○ Phone offline</span><div class="monitor-detail">Last seen ${formatDate(phone.lastSeenAt)}</div>`;
+  }
+  if (phone.problem) return `<span class="monitor-state monitor-warn">⚠ ${escapeHtml(phone.problem)}</span>`;
+  if (!phone.slots.length) return '<span class="monitor-state monitor-on">● Phone connected</span>';
+  return phone.slots.map((slot) => `<div class="slot-line">${slotConnection[slot.state] || ''}</div>`).join('');
+}
+
 function renderAsset(phone, linkedAssetIds) {
   const linked = allAssets.find((asset) => asset.id === phone.deviceId);
   if (!isAdmin) return linked ? `${escapeHtml(linked.deviceName)} · ${escapeHtml(linked.attachedPc)}` : 'Not linked';
@@ -85,10 +102,8 @@ function renderPhones() {
   }
   const linkedAssetIds = new Set(allPhones.map((phone) => phone.deviceId).filter(Boolean));
   phonesTableBody.innerHTML = allPhones.map((phone) => {
-    const connection = phone.problem && phone.connected ? `<span class="monitor-state monitor-warn">⚠ ${escapeHtml(phone.problem)}</span>`
-      : phone.connected ? '<span class="monitor-state monitor-on">● Connected</span>'
-        : `<span class="monitor-state monitor-off">○ Offline</span><div class="monitor-detail">Last seen ${formatDate(phone.lastSeenAt)}</div>`;
-    const sims = phone.slots.length ? phone.slots.map((slot) => renderSlot(phone, slot)).join('<br>') : '—';
+    const connection = renderConnection(phone);
+    const sims = phone.slots.length ? phone.slots.map((slot) => `<div class="slot-line">${renderSlot(phone, slot)}</div>`).join('') : '—';
     return `
       <tr>
         <td>${phoneTitle(phone)}<div class="monitor-detail">${escapeHtml(phone.osVersion || '')} · ID …${escapeHtml(phone.hardwareId.slice(-4))}</div></td>

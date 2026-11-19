@@ -873,6 +873,14 @@ tbody tr:hover {
   cursor: wait;
 }
 
+.slot-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  white-space: nowrap;
+}
+
 .monitor-state {
   font-weight: 700;
   white-space: nowrap;
