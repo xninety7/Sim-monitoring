@@ -124,7 +124,7 @@ Everyone signs in on the app's login page with their own account. There is no pu
 sudo bash -c 'set -a; . /etc/sim-monitoring/app.env; cd /opt/sim-monitoring && node scripts/create-user.js yourname --admin'
 ```
 
-You'll be asked for the password twice (8 characters minimum). After that, sign in and open **Users** in the dashboard header to add teammates, reset passwords, make or remove admins, and delete accounts. Only admins see the Users page. Admins can't remove their own admin access or delete themselves, so at least one admin always remains.
+You'll be asked for the password twice (8 characters minimum). After that, sign in and open **Admin** in the dashboard header to add teammates, reset passwords, make or remove admins, and delete accounts. Only admins see the Admin page. Admins can't remove their own admin access or delete themselves, so at least one admin always remains.
 
 If every admin is locked out, run the command above again: for an existing username it resets the password (signing them out everywhere), and `--admin` restores admin access.
 
@@ -132,7 +132,7 @@ Sessions last 7 days. After 10 failed sign-ins from one IP address, sign-in is b
 
 ### Activity log and identifying users
 
-The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is the signed-in user. Clicking **Check** on an asset records the signed-in user and the current date and time in its **Last Seen** column, and is logged as "Checked asset".
+The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is the signed-in user. On the **Device inventory** page, clicking **Check** on an asset records the signed-in user and the current date and time in its **Last Seen** column, and is logged as "Checked asset".
 
 For assets with two numbers, set **Phone number slots** to **Two numbers** and fill each slot's phone number and TELCO provider. **Move number** moves the selected source slot to a destination slot; if that destination slot is occupied, the phone number and provider move together as a swap. Changes are transactional and logged with both asset codes and slot numbers.
 
@@ -142,7 +142,7 @@ Open pages update live: when anyone adds, edits, checks, moves or deletes someth
 
 ## Automatic SIM monitoring
 
-A small agent on each office Mac checks the phones plugged into it every 30 seconds and reports to the dashboard. For each linked asset, the dashboard then shows whether the phone is **connected**, and for each SIM slot whether the SIM is **present**, **removed** or **changed** (swapped for a different SIM, even from the same carrier). Changes appear live and are recorded in Recent activity. A phone is marked offline about 90 seconds after its Mac stops reporting.
+A small agent on each office Mac checks the phones plugged into it every 30 seconds and reports to the dashboard. The dashboard (the home page) lists every monitored phone and shows whether the phone is **connected**, and for each SIM slot whether the SIM is **present**, **removed** or **changed** (swapped for a different SIM, even from the same carrier). Changes appear live and are recorded in Recent activity. A phone is marked offline about 90 seconds after its Mac stops reporting.
 
 | | Android | iPhone |
 |---|---|---|
@@ -154,7 +154,7 @@ Only a hash of each SIM serial leaves the Mac.
 
 ### Set up a Mac
 
-1. On the dashboard, open **Users** → **Mac agents**, enter the Mac's name (e.g. `PC-9`) and click **Create agent key**. Copy the key; it is shown only once.
+1. On the dashboard, open **Admin** → **Mac agents**, enter the Mac's name (e.g. `PC-9`) and click **Create agent key**. Copy the key; it is shown only once.
 2. On that Mac, install the requirements and run the installer from the `agent/` folder of this repository:
 
    ```bash
@@ -164,13 +164,13 @@ Only a hash of each SIM serial leaves the Mac.
 
    Paste the agent key when asked. The installer sends a test report, then sets the agent to run in the background and start at login. Its log is `~/Library/Logs/sim-agent.log`.
 3. Plug in each phone and complete the phone's one-time setup (table above).
-4. Back on **Users** → **Monitored phones**, pick the asset for each phone that appears.
+4. Back on the dashboard, pick the asset for each phone that appears (admins only).
 
 Keep the Macs awake and signed in (System Settings → Energy → **Prevent automatic sleeping when the display is off**); a sleeping Mac makes its phones show as offline.
 
 When a slot shows ⚠ **SIM changed** or ⚠ **SIM removed** and the change was intentional, click **Accept** on the dashboard to make it the new expected state. To check what a Mac can see without sending anything, run `node agent/sim-agent.js --dry-run` (or `node scripts/sim-probe.js` for more detail).
 
-To stop the agent on a Mac: `launchctl bootout gui/$(id -u)/me.bewen.sim-agent`. To stop a Mac from reporting, revoke its key on the Users page.
+To stop the agent on a Mac: `launchctl bootout gui/$(id -u)/me.bewen.sim-agent`. To stop a Mac from reporting, revoke its key on the Admin page.
 
 ## API overview
 

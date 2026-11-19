@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Users | SIM & Phone Monitor</title>
+    <title>Admin | SIM & Phone Monitor</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -12,11 +12,11 @@
       <header class="activity-page-header">
         <div>
           <p class="activity-eyebrow">SIM & Phone Monitor</p>
-          <h1>Users</h1>
-          <p class="activity-page-description">Add teammates, reset passwords, and choose who can manage users and phones.</p>
+          <h1>Admin</h1>
+          <p class="activity-page-description">Manage user accounts and the agent keys for the office Macs.</p>
         </div>
         <span class="session-controls">
-          <a class="secondary-btn activity-back-link" href="/">Back to inventory</a>
+          <a class="secondary-btn activity-back-link" href="/">Back to dashboard</a>
           <button id="logoutBtn" class="secondary-btn" type="button">Log out</button>
         </span>
       </header>
@@ -65,6 +65,37 @@
         </div>
       </section>
 
+      <section class="panel admin-panel" aria-labelledby="agentsHeading">
+        <div class="table-header">
+          <h2 id="agentsHeading">Mac agents</h2>
+          <span id="agentsCount">Loading…</span>
+        </div>
+        <p class="admin-help">Each office Mac needs its own agent key. Create one here, then paste it into that Mac's agent settings.</p>
+        <form id="addAgentForm" class="add-user-form add-agent-form">
+          <label class="device-form-label">
+            <span>Mac name</span>
+            <input name="name" type="text" maxlength="50" placeholder="e.g. PC-9" required />
+          </label>
+          <button class="primary-btn" type="submit">Create agent key</button>
+        </form>
+        <div id="newAgentKey" class="new-agent-key" hidden>
+          <p><strong>Agent key for <span id="newAgentName"></span></strong>. Copy it now; it won't be shown again.</p>
+          <code id="newAgentToken"></code>
+          <button id="copyAgentTokenBtn" class="secondary-btn" type="button">Copy key</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Mac</th>
+                <th>Last report</th>
+                <th>Phones connected</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="agentsTableBody"></tbody>
+          </table>
+  
       <dialog id="resetPasswordDialog" class="switch-dialog">
         <form id="resetPasswordForm" class="switch-form">
           <h2>Reset password</h2>

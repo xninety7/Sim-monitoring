@@ -153,8 +153,81 @@ resetPasswordForm.addEventListener('submit', async (event) => {
   }
 });
 
+const agentsTableBody = document.getElementById('agentsTableBody');
+const agentsCount = document.getElementById('agentsCount');
+const addAgentForm = document.getElementById('addAgentForm');
+const newAgentKey = document.getElementById('newAgentKey');
+const newAgentName = document.getElementById('newAgentName');
+const newAgentToken = document.getElementById('newAgentToken');
+const copyAgentTokenBtn = document.getElementById('copyAgentTokenBtn');
+let allAgents = [];
+function renderAgents() {
+  agentsCount.textContent = `${allAgents.length} Mac${allAgents.length === 1 ? '' : 's'}`;
+  agentsTableBody.innerHTML = allAgents.length
+    ? allAgents.map((agent) => `
+      <tr>
+        <td><strong>${escapeHtml(agent.name)}</strong></td>
+        <td>${formatDate(agent.lastReportAt)}</td>
+        <td>${agent.connectedPhones}</td>
+        <td><button class="delete-btn delete-agent-btn" data-id="${agent.id}" type="button">Revoke key</button></td>
+      </tr>
+    `).join('')
+    : '<tr><td colspan="4" class="empty-state">No Mac agents yet.</td></tr>';
+}
+
+async function loadAgents() {
+  try {
+    allAgents = await apiRequest('/api/agents');
+    renderAgents();
+  } catch (error) {
+    agentsCount.textContent = 'Unavailable';
+    showMessage(error.message, true);
+  }
+}
+
+agentsTableBody.addEventListener('click', async (event) => {
+  const button = event.target.closest('.delete-agent-btn');
+  if (!button) return;
+  const agent = allAgents.find((item) => item.id === Number(button.dataset.id));
+  if (!agent || !window.confirm(`Revoke the agent key for ${agent.name}? That Mac will stop reporting until it gets a new key.`)) return;
+  try {
+    await apiRequest(`/api/agents/${agent.id}`, { method: 'DELETE' });
+    showMessage(`Revoked the agent key for ${agent.name}.`);
+    await loadAgents();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+});
+
+addAgentForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = String(new FormData(addAgentForm).get('name') || '').trim();
+  try {
+    const agent = await apiRequest('/api/agents', { method: 'POST', body: JSON.stringify({ name }) });
+    addAgentForm.reset();
+    newAgentName.textContent = agent.name;
+    newAgentToken.textContent = agent.token;
+    newAgentKey.hidden = false;
+    showMessage('');
+    await loadAgents();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+});
+
+copyAgentTokenBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(newAgentToken.textContent);
+    copyAgentTokenBtn.textContent = 'Copied';
+  } catch {
+    window.getSelection().selectAllChildren(newAgentToken);
+  }
+});
+
 window.addEventListener('live-change', () => {
   loadUsers();
+  loadAgents();
 });
 
 loadUsers();
+loadAgents();

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Device Inventory | SIM & Phone Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <p class="signed-in-as">Signed in as <strong id="currentUserName">…</strong> · <span id="liveStatus" class="live-status offline">Connecting…</span></p>
+      <header class="topbar">
+        <div class="dashboard-title">
+          <h1>SIM & Phone Monitor</h1>
+        </div>
+        <div class="header-controls">
+          <section class="toolbar" aria-label="Search and filter devices">
+            <label class="search-field" for="searchInput">
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="Search"
+                aria-label="Search devices"
+              />
+            </label>
+
+            <label class="filter-field" for="statusFilter">
+              <select id="statusFilter" aria-label="Filter by status">
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="offline">Offline</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </label>
+          </section>
+          <button id="toggleDeviceFormBtn" class="primary-btn add-device-toggle" type="button" aria-haspopup="dialog" aria-controls="addDeviceDialog">Add device</button>
+          <a class="secondary-btn activity-link" href="/">Monitored phones</a>
+          <a class="secondary-btn activity-link" href="activity.html">Recent activity</a>
+          <a id="adminLink" class="secondary-btn activity-link" href="admin.html" hidden>Admin</a>
+          <button id="logoutBtn" class="secondary-btn" type="button">Log out</button>
+        </div>
+      </header>
+
+      <p id="appMessage" class="app-message" role="status" hidden></p>
+      <button id="importLocalBtn" class="secondary-btn import-local-btn" type="button" hidden>Import this browser's saved devices</button>
+
+      <section class="stats-grid" id="statsGrid">
+        <article class="stat-card total">
+          <span class="label">Total Phones</span>
+          <strong id="totalPhones">0</strong>
+        </article>
+        <article class="stat-card active">
+          <span class="label">Active SIMs</span>
+          <strong id="activeCount">0</strong>
+        </article>
+        <article class="stat-card inactive">
+          <span class="label">Inactive</span>
+          <strong id="inactiveCount">0</strong>
+        </article>
+        <article class="stat-card offline">
+          <span class="label">Offline</span>
+          <strong id="offlineCount">0</strong>
+        </article>
+      </section>
+
+      <dialog id="addDeviceDialog" class="switch-dialog asset-form-dialog">
+        <form id="deviceForm" class="device-form add-device-form asset-form">
+          <h2 class="add-device-title">Add an asset</h2>
+          <div class="field-grid">
+            <label>
+              <span>Asset code</span>
+              <input id="deviceNameInput" name="deviceName" type="text" required />
+            </label>
+            <label>
+              <span>Attached PC</span>
+              <input id="attachedPcInput" name="attachedPc" type="text" required />
+            </label>
+            <label>
+              <span>AnyDesk ID</span>
+              <input id="anydeskIdInput" name="anydeskId" type="text" />
+            </label>
+            <label>
+              <span>Color</span>
+              <input id="colorInput" name="color" type="text" placeholder="e.g. Black" />
+            </label>
+            <label>
+              <span>Phone number slots</span>
+              <select name="simSlotCount" data-sim-slot-count>
+                <option value="1">One number</option>
+                <option value="2">Two numbers</option>
+              </select>
+            </label>
+            <fieldset class="sim-slot-fields">
+              <legend>Phone number 1</legend>
+              <label><span>Phone number</span><input name="sim1PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim1TelcoProvider" type="text" placeholder="e.g. Verizon" /></label>
+            </fieldset>
+            <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
+              <legend>Phone number 2</legend>
+              <label><span>Phone number</span><input name="sim2PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim2TelcoProvider" type="text" placeholder="e.g. Verizon" /></label>
+            </fieldset>
+            <label>
+              <span>Status</span>
+              <select id="statusInput" name="status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="offline">Offline</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </label>
+          </div>
+          <div class="dialog-actions add-device-actions">
+            <button id="cancelAddDeviceBtn" type="button" class="secondary-btn">Cancel</button>
+            <button type="submit" class="primary-btn save-device-btn">Save device</button>
+          </div>
+        </form>
+      </dialog>
+
+      <main class="panel">
+        <div class="table-header">
+          <h2>Device Inventory</h2>
+          <span id="resultsCount">0 records</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Asset code</th>
+                <th>Attached PC</th>
+                <th>AnyDesk ID</th>
+                <th>Color</th>
+                <th>Phone numbers</th>
+                <th>Status</th>
+                <th>Phone</th>
+                <th>Last Seen</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="deviceTableBody"></tbody>
+          </table>
+        </div>
+        <nav id="pagination" class="pagination" aria-label="Device inventory pages" hidden>
+          <button id="previousPageBtn" class="secondary-btn pagination-btn" type="button">Previous</button>
+          <span id="pageInfo" aria-live="polite"></span>
+          <button id="nextPageBtn" class="secondary-btn pagination-btn" type="button">Next</button>
+        </nav>
+      </main>
+
+      </section>
+      </div>
+
+      <dialog id="editDeviceDialog" class="switch-dialog asset-form-dialog">
+        <form id="editDeviceForm" class="switch-form asset-form">
+          <h2 class="add-device-title">Edit asset</h2>
+          <div class="field-grid">
+            <label class="device-form-label">
+              <span>Asset code</span>
+              <input name="deviceName" type="text" required />
+            </label>
+            <label class="device-form-label">
+              <span>Attached PC</span>
+              <input name="attachedPc" type="text" required />
+            </label>
+            <label class="device-form-label">
+              <span>AnyDesk ID</span>
+              <input name="anydeskId" type="text" />
+            </label>
+            <label class="device-form-label">
+              <span>Color</span>
+              <input name="color" type="text" />
+            </label>
+            <label class="device-form-label">
+              <span>Phone number slots</span>
+              <select name="simSlotCount" data-sim-slot-count>
+                <option value="1">One number</option>
+                <option value="2">Two numbers</option>
+              </select>
+            </label>
+            <fieldset class="sim-slot-fields">
+              <legend>Phone number 1</legend>
+              <label><span>Phone number</span><input name="sim1PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim1TelcoProvider" type="text" /></label>
+            </fieldset>
+            <fieldset class="sim-slot-fields sim-slot-2" data-sim-slot="2" hidden>
+              <legend>Phone number 2</legend>
+              <label><span>Phone number</span><input name="sim2PhoneNumber" type="tel" /></label>
+              <label><span>TELCO provider</span><input name="sim2TelcoProvider" type="text" /></label>
+            </fieldset>
+            <label class="device-form-label">
+              <span>Status</span>
+              <select name="status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="offline">Offline</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </label>
+          </div>
+          <div class="dialog-actions">
+            <button class="secondary-btn" type="button" id="cancelEditDeviceBtn">Cancel</button>
+            <button class="primary-btn" type="submit">Save changes</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="switchSimDialog" class="switch-dialog">
+        <form id="switchSimForm" class="switch-form">
+          <h2>Move phone number</h2>
+          <p id="switchSourceLabel" class="switch-description"></p>
+          <label class="device-form-label" for="switchSourceSlotInput">
+            <span>Phone number to move</span>
+            <select id="switchSourceSlotInput" name="sourceSlot" required></select>
+          </label>
+          <label class="filter-field" for="switchTargetInput">
+            <span>Destination asset</span>
+            <select id="switchTargetInput" name="targetId" required></select>
+          </label>
+          <label class="device-form-label" for="switchTargetSlotInput">
+            <span>Destination phone-number slot</span>
+            <select id="switchTargetSlotInput" name="targetSlot" required></select>
+          </label>
+          <p id="switchNote" class="switch-note"></p>
+          <div class="dialog-actions">
+            <button class="secondary-btn" type="button" id="cancelSwitchBtn">Cancel</button>
+            <button id="confirmSwitchBtn" class="primary-btn" type="submit">Confirm switch</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+
+    <script src="session.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
