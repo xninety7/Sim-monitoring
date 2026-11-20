@@ -1,6 +1,7 @@
 #!/bin/bash
 # Installs the SIM monitoring agent for the current macOS user and starts it automatically at login.
-# Usage: ./install.sh   (asks for this Mac's agent key from the dashboard's Users page)
+# Usage: ./install.sh   (asks for this Mac's agent key from the dashboard's Admin page, and how often to check)
+# Run it again to change the interval; the current key can be kept.
 # To uninstall: launchctl bootout gui/$(id -u)/me.bewen.sim-agent && rm ~/Library/LaunchAgents/me.bewen.sim-agent.plist
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -13,17 +14,37 @@ for tool in node adb idevice_id ideviceinfo; do
   fi
 done
 
-read -r -s -p "Agent key for this Mac (starts with sma_): " TOKEN
-echo
+LABEL="me.bewen.sim-agent"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+plist_value() { /usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:$1" "$PLIST" 2>/dev/null || true; }
+
+# When reinstalling (e.g. to change the check interval), the current key can be kept.
+CURRENT_TOKEN="$(plist_value SIM_AGENT_TOKEN)"
+if [ -n "$CURRENT_TOKEN" ]; then
+  read -r -s -p "Agent key for this Mac (press Enter to keep the current one): " TOKEN
+  echo
+  TOKEN="${TOKEN:-$CURRENT_TOKEN}"
+else
+  read -r -s -p "Agent key for this Mac (starts with sma_): " TOKEN
+  echo
+fi
 if [[ ! "$TOKEN" =~ ^sma_[A-Za-z0-9_-]+$ ]]; then
-  echo "That doesn't look like an agent key. Create one on the dashboard's Users page."
+  echo "That doesn't look like an agent key. Create one on the dashboard under Admin -> Mac agents."
+  exit 1
+fi
+
+# How often to check the phones. Longer intervals mean less work, but changes show up later.
+DEFAULT_INTERVAL="${SIM_AGENT_INTERVAL_SECONDS:-$(plist_value SIM_AGENT_INTERVAL_SECONDS)}"
+DEFAULT_INTERVAL="${DEFAULT_INTERVAL:-60}"
+read -r -p "Check the phones every how many seconds? (10-600, Enter for $DEFAULT_INTERVAL): " INTERVAL
+INTERVAL="${INTERVAL:-$DEFAULT_INTERVAL}"
+if [[ ! "$INTERVAL" =~ ^[0-9]+$ ]] || [ "$INTERVAL" -lt 10 ] || [ "$INTERVAL" -gt 600 ]; then
+  echo "The interval must be a whole number of seconds from 10 to 600."
   exit 1
 fi
 
 URL="${SIM_AGENT_URL:-https://sim-monitoring.bewen.me}"
-LABEL="me.bewen.sim-agent"
 DEST="$HOME/sim-agent"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/Library/Logs/sim-agent.log"
 # launchd starts with a minimal PATH, so pass the folders where Homebrew installed the tools.
 TOOL_PATH="$(dirname "$(command -v node)"):$(dirname "$(command -v adb)"):$(dirname "$(command -v ideviceinfo)"):/usr/bin:/bin"
@@ -34,7 +55,7 @@ cp sim-agent.js phone-reader.js package.json "$DEST/"
 echo "Sending a test report to $URL ..."
 REPORTED=0
 for attempt in 1 2 3; do
-  if SIM_AGENT_URL="$URL" SIM_AGENT_TOKEN="$TOKEN" PATH="$TOOL_PATH" node "$DEST/sim-agent.js" --once; then
+  if SIM_AGENT_URL="$URL" SIM_AGENT_TOKEN="$TOKEN" SIM_AGENT_INTERVAL_SECONDS="$INTERVAL" PATH="$TOOL_PATH" node "$DEST/sim-agent.js" --once; then
     REPORTED=1
     break
   fi
@@ -62,9 +83,14 @@ cat > "$PLIST" <<PLIST
   <dict>
     <key>SIM_AGENT_TOKEN</key><string>$TOKEN</string>
     <key>SIM_AGENT_URL</key><string>$URL</string>
+    <key>SIM_AGENT_INTERVAL_SECONDS</key><string>$INTERVAL</string>
     <key>PATH</key><string>$TOOL_PATH</string>
   </dict>
   <key>RunAtLoad</key><true/>
+  <!-- Run at background priority so the Mac's own work (e.g. test automation) always comes first. -->
+  <key>ProcessType</key><string>Background</string>
+  <key>Nice</key><integer>10</integer>
+  <key>LowPriorityIO</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>

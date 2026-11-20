@@ -55,7 +55,10 @@ function renderUsers() {
     const isSelf = user.id === currentUserId;
     return `
       <tr>
-        <td><strong>${escapeHtml(user.username)}</strong>${isSelf ? ' <span class="you-label">(you)</span>' : ''}</td>
+        <td>
+          <strong>${escapeHtml(user.username)}</strong>${isSelf ? ' <span class="you-label">(you)</span>' : ''}
+          ${user.usesLark ? `<div class="monitor-detail">Lark${user.displayName ? ` · ${escapeHtml(user.displayName)}` : ''}</div>` : ''}
+        </td>
         <td><span class="status-pill ${user.isAdmin ? 'role-admin' : 'role-user'}">${user.isAdmin ? 'Admin' : 'User'}</span></td>
         <td>${formatDate(user.lastLoginAt)}</td>
         <td>${formatDate(user.createdAt)}</td>
@@ -168,11 +171,12 @@ function renderAgents() {
       <tr>
         <td><strong>${escapeHtml(agent.name)}</strong></td>
         <td>${formatDate(agent.lastReportAt)}</td>
+        <td>${agent.intervalSeconds ? `${agent.intervalSeconds} seconds` : '—'}</td>
         <td>${agent.connectedPhones}</td>
         <td><button class="delete-btn delete-agent-btn" data-id="${agent.id}" type="button">Revoke key</button></td>
       </tr>
     `).join('')
-    : '<tr><td colspan="4" class="empty-state">No Mac agents yet.</td></tr>';
+    : '<tr><td colspan="5" class="empty-state">No Mac agents yet.</td></tr>';
 }
 
 async function loadAgents() {

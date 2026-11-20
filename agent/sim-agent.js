@@ -1,8 +1,8 @@
 // SIM monitoring agent: every 30 seconds, reads the phones plugged into this Mac and reports them
 // to the dashboard. Configure with environment variables:
-//   SIM_AGENT_TOKEN   agent key created on the dashboard's Users page (required unless --dry-run)
+//   SIM_AGENT_TOKEN   agent key created on the dashboard's Admin page (required unless --dry-run)
 //   SIM_AGENT_URL     dashboard address (default https://sim-monitoring.bewen.me)
-//   SIM_AGENT_INTERVAL_SECONDS  seconds between reports (default 30)
+//   SIM_AGENT_INTERVAL_SECONDS  seconds between reports, 10 to 600 (default 30)
 // Usage: node sim-agent.js [--once] [--dry-run]
 //   --once     send one report and exit
 //   --dry-run  print what would be sent instead of sending it
@@ -10,12 +10,13 @@ import { readPhones } from './phone-reader.js';
 
 const url = (process.env.SIM_AGENT_URL || 'https://sim-monitoring.bewen.me').replace(/\/+$/, '');
 const token = process.env.SIM_AGENT_TOKEN;
-const intervalMs = Math.max(10, Number(process.env.SIM_AGENT_INTERVAL_SECONDS) || 30) * 1000;
+const intervalSeconds = Math.min(600, Math.max(10, Math.round(Number(process.env.SIM_AGENT_INTERVAL_SECONDS)) || 30));
+const intervalMs = intervalSeconds * 1000;
 const once = process.argv.includes('--once');
 const dryRun = process.argv.includes('--dry-run');
 
 if (!token && !dryRun) {
-  console.error('SIM_AGENT_TOKEN is required. Create an agent key on the dashboard\'s Users page.');
+  console.error('SIM_AGENT_TOKEN is required. Create an agent key on the dashboard\'s Admin page.');
   process.exit(1);
 }
 
@@ -45,7 +46,8 @@ async function reportOnce() {
   const response = await fetch(`${url}/api/agent/report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ phones }),
+    // The interval tells the dashboard how long to wait before marking this Mac's phones offline.
+    body: JSON.stringify({ phones, intervalSeconds }),
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {

@@ -130,6 +130,22 @@ If every admin is locked out, run the command above again: for an existing usern
 
 Sessions last 7 days. After 10 failed sign-ins from one IP address, sign-in is blocked for 15 minutes. Do not publish the site without HTTPS, because the session cookie is only marked secure when served over HTTPS.
 
+### Sign in with Lark (optional)
+
+People can sign in with their Lark account instead of a password. The first time someone signs in with Lark, a regular (non-admin) account is created for them, named after their Lark name (e.g. `lyden.faye`); an admin can then make them an admin on the Admin page. Password sign-in keeps working, as a backup.
+
+1. In the Lark Developer Console (open.larksuite.com), create a **custom app**, e.g. "SIM Monitor".
+2. Under **Security settings**, add the redirect URL `https://YOUR_DOMAIN/api/auth/lark/callback`.
+3. Create a version and publish it (your organisation's admin may need to approve it).
+4. Add the app's **App ID** and **App Secret** from its Credentials page to `/etc/sim-monitoring/app.env`, then restart the app:
+
+   ```
+   LARK_APP_ID=cli_...
+   LARK_APP_SECRET=...
+   ```
+
+The login page then shows **Sign in with Lark**. Optional settings: `LARK_TENANT_KEY` accepts only people from that Lark organisation (a custom app is already limited to its own organisation), `LARK_REDIRECT_URI` overrides the callback address, and `LARK_SCOPE` requests extra permissions (for example `contact:user.email:readonly` to name accounts after work emails; the app must have that permission).
+
 ### Activity log and identifying users
 
 The dashboard records successful device additions, edits, deletions, phone-number moves/swaps, and imports in PostgreSQL. Open the separate Recent activity page from the dashboard header to browse the log ten actions at a time. It does not record every button click or unsuccessful attempt. The actor is the signed-in user. On the **Device inventory** page, clicking **Check** on an asset records the signed-in user and the current date and time in its **Last Seen** column, and is logged as "Checked asset".
@@ -142,7 +158,7 @@ Open pages update live: when anyone adds, edits, checks, moves or deletes someth
 
 ## Automatic SIM monitoring
 
-A small agent on each office Mac checks the phones plugged into it every 30 seconds and reports to the dashboard. The dashboard (the home page) lists every monitored phone and shows whether the phone is **connected**, and for each SIM slot whether the SIM is **present**, **removed** or **changed** (swapped for a different SIM, even from the same carrier). Changes appear live and are recorded in Recent activity. A phone is marked offline about 90 seconds after its Mac stops reporting.
+A small agent on each office Mac checks the phones plugged into it (every 60 seconds by default; the installer asks) and reports to the dashboard. The dashboard (the home page) lists every monitored phone and shows whether the phone is **connected**, and for each SIM slot whether the SIM is **present**, **removed** or **changed** (swapped for a different SIM, even from the same carrier). Changes appear live and are recorded in Recent activity. A phone is marked offline once its Mac misses three reports in a row (at least 90 seconds).
 
 | | Android | iPhone |
 |---|---|---|
@@ -150,7 +166,7 @@ A small agent on each office Mac checks the phones plugged into it every 30 seco
 | Phone number read automatically | ❌ | ✅ |
 | One-time setup on the phone | Turn on USB debugging and tap **Allow** | Tap **Trust This Computer** |
 
-Only a hash of each SIM serial leaves the Mac.
+Only a hash of each SIM serial leaves the Mac. When a SIM moves between iPhones, the dashboard shows where it went ("moved to BGC-06-0068 slot 1") on both phones. Android only gives a per-phone SIM id, so a SIM moved between Android phones shows as removed on one and changed on the other.
 
 ### Set up a Mac
 
@@ -162,7 +178,7 @@ Only a hash of each SIM serial leaves the Mac.
    cd agent && ./install.sh
    ```
 
-   Paste the agent key when asked. The installer sends a test report, then sets the agent to run in the background and start at login. Its log is `~/Library/Logs/sim-agent.log`.
+   Paste the agent key when asked, and choose how often to check the phones (10–600 seconds). The agent runs at background priority, so it doesn't slow down other work such as test automation. To change the interval later, run `./install.sh` again and press Enter to keep the current key. The installer sends a test report, then sets the agent to run in the background and start at login. Its log is `~/Library/Logs/sim-agent.log`.
 3. Plug in each phone and complete the phone's one-time setup (table above).
 4. Back on the dashboard, pick the asset for each phone that appears (admins only).
 

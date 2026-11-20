@@ -51,15 +51,28 @@ function phoneTitle(phone) {
   return `<strong>${platform}</strong> ${escapeHtml(model)}`;
 }
 
+function placeText(place) {
+  return `${escapeHtml(place.phone)} slot ${place.slot}`;
+}
+
 function renderSlot(phone, slot) {
   const label = `Slot ${slot.slotNumber}:`;
   const accept = `<button class="accept-sim-btn" data-phone-id="${phone.id}" data-slot="${slot.slotNumber}" type="button">Accept</button>`;
-  if (slot.state === 'present') return `${label} <span class="sim-badge sim-ok">✓ ${escapeHtml(slot.simLabel || 'SIM in phone')}</span>`;
+  const from = slot.movedFrom ? ` from ${placeText(slot.movedFrom)}` : '';
+  if (slot.state === 'present') {
+    const moved = from ? ` <span class="monitor-detail">moved${from}</span>` : '';
+    return `${label} <span class="sim-badge sim-ok">✓ ${escapeHtml(slot.simLabel || 'SIM in phone')}</span>${moved}`;
+  }
   if (slot.state === 'empty') return `${label} <span class="monitor-detail">empty</span>`;
   if (slot.state === 'removed') {
-    return `${label} <span class="sim-badge sim-alert">⚠ SIM removed${slot.expectedSimLabel ? ` (was ${escapeHtml(slot.expectedSimLabel)})` : ''}</span>${accept}`;
+    const what = escapeHtml(slot.expectedSimLabel || 'SIM');
+    const text = slot.movedTo ? `⚠ ${what} moved to ${placeText(slot.movedTo)}` : `⚠ SIM removed${slot.expectedSimLabel ? ` (was ${what})` : ''}`;
+    return `${label} <span class="sim-badge sim-alert">${text}</span>${accept}`;
   }
-  return `${label} <span class="sim-badge sim-alert">⚠ SIM changed: ${escapeHtml(slot.expectedSimLabel || 'expected SIM')} → ${escapeHtml(slot.simLabel || 'unknown SIM')}</span>${accept}`;
+  const text = slot.movedFrom
+    ? `⚠ ${escapeHtml(slot.simLabel || 'SIM')} moved here${from} (was ${escapeHtml(slot.expectedSimLabel || 'another SIM')})`
+    : `⚠ SIM changed: ${escapeHtml(slot.expectedSimLabel || 'expected SIM')} → ${escapeHtml(slot.simLabel || 'unknown SIM')}`;
+  return `${label} <span class="sim-badge sim-alert">${text}</span>${accept}`;
 }
 
 // One connection line per SIM slot, lined up with the SIMs column, so each SIM's status is visible.
@@ -76,7 +89,10 @@ function renderConnection(phone) {
   }
   if (phone.problem) return `<span class="monitor-state monitor-warn">⚠ ${escapeHtml(phone.problem)}</span>`;
   if (!phone.slots.length) return '<span class="monitor-state monitor-on">● Phone connected</span>';
-  return phone.slots.map((slot) => `<div class="slot-line">${slotConnection[slot.state] || ''}</div>`).join('');
+  return phone.slots.map((slot) => {
+    const moved = slot.state === 'removed' && slot.movedTo ? '<span class="monitor-state monitor-warn">○ SIM moved</span>' : null;
+    return `<div class="slot-line">${moved || slotConnection[slot.state] || ''}</div>`;
+  }).join('');
 }
 
 function renderAsset(phone, linkedAssetIds) {

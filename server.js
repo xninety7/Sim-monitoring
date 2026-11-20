@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from './lib/passwords.js';
 import { registerMonitoring } from './lib/monitoring.js';
+import { registerLarkLogin } from './lib/lark.js';
 
 const { Pool } = pg;
 const app = express();
@@ -49,7 +50,11 @@ const deviceFields = {
 const sessionCookie = 'sid';
 const sessionMaxAgeSeconds = 7 * 24 * 60 * 60;
 // /api/agent/report authenticates with its own agent key instead of a session.
-const publicPaths = new Set(['/login.html', '/login.js', '/styles.css', '/api/login', '/api/health', '/api/agent/report']);
+// The Lark sign-in routes run before the person has a session.
+const publicPaths = new Set([
+  '/login.html', '/login.js', '/styles.css', '/api/login', '/api/health', '/api/agent/report',
+  '/api/auth/options', '/api/auth/lark/start', '/api/auth/lark/callback',
+]);
 const loginAttempts = new Map();
 const loginWindowMs = 15 * 60 * 1000;
 const maxLoginFailures = 10;
@@ -109,6 +114,8 @@ function toUser(row) {
     isAdmin: row.is_admin,
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at,
+    displayName: row.display_name ?? null,
+    usesLark: Boolean(row.lark_open_id),
   };
 }
 
@@ -305,6 +312,25 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// Signs the user in on this browser: stores a new session and sets its cookie.
+async function startSession(req, res, userId) {
+  const token = randomBytes(32).toString('base64url');
+  await pool.query('DELETE FROM sessions WHERE expires_at <= now()');
+  await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [userId]);
+  await pool.query(
+    `INSERT INTO sessions (token_hash, user_id, expires_at)
+     VALUES ($1, $2, now() + make_interval(secs => $3))`,
+    [hashToken(token), userId, sessionMaxAgeSeconds],
+  );
+  res.cookie(sessionCookie, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: req.secure,
+    maxAge: sessionMaxAgeSeconds * 1000,
+    path: '/',
+  });
+}
+
 app.post('/api/login', async (req, res) => {
   if (isLoginBlocked(req.ip)) {
     return res.status(429).json({ error: 'Too many failed sign-in attempts. Try again in 15 minutes.' });
@@ -326,21 +352,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     loginAttempts.delete(req.ip);
-    const token = randomBytes(32).toString('base64url');
-    await pool.query('DELETE FROM sessions WHERE expires_at <= now()');
-    await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
-    await pool.query(
-      `INSERT INTO sessions (token_hash, user_id, expires_at)
-       VALUES ($1, $2, now() + make_interval(secs => $3))`,
-      [hashToken(token), user.id, sessionMaxAgeSeconds],
-    );
-    res.cookie(sessionCookie, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: req.secure,
-      maxAge: sessionMaxAgeSeconds * 1000,
-      path: '/',
-    });
+    await startSession(req, res, user.id);
     res.json({ username: user.username });
   } catch (error) {
     sendDatabaseError(res, error);
@@ -363,6 +375,7 @@ app.get('/api/me', (req, res) => {
 });
 
 const monitoring = registerMonitoring(app, { pool, logActivity, requireAdmin, sendDatabaseError, hashToken });
+registerLarkLogin(app, { pool, startSession, logActivity, hashPassword });
 
 app.get('/api/events', (req, res) => {
   res.set({
@@ -397,7 +410,7 @@ app.get('/api/events', (req, res) => {
 app.get('/api/users', requireAdmin, async (_req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, is_admin, created_at, last_login_at FROM users ORDER BY username',
+      'SELECT id, username, is_admin, created_at, last_login_at, display_name, lark_open_id FROM users ORDER BY username',
     );
     res.json(result.rows.map(toUser));
   } catch (error) {
@@ -416,7 +429,7 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (username, password_hash, is_admin) VALUES ($1, $2, $3)
        ON CONFLICT (username) DO NOTHING
-       RETURNING id, username, is_admin, created_at, last_login_at`,
+       RETURNING id, username, is_admin, created_at, last_login_at, display_name, lark_open_id`,
       [username, await hashPassword(password), isAdmin],
     );
     if (!result.rowCount) return res.status(409).json({ error: 'That username is already taken.' });
@@ -448,7 +461,7 @@ app.patch('/api/users/:id', requireAdmin, async (req, res) => {
       `UPDATE users
        SET password_hash = COALESCE($2, password_hash), is_admin = COALESCE($3, is_admin)
        WHERE id = $1
-       RETURNING id, username, is_admin, created_at, last_login_at`,
+       RETURNING id, username, is_admin, created_at, last_login_at, display_name, lark_open_id`,
       [id, password === undefined ? null : await hashPassword(password), isAdmin ?? null],
     );
     if (!result.rowCount) return res.status(404).json({ error: 'User not found.' });

@@ -31,3 +31,22 @@ loginForm.addEventListener('submit', async (event) => {
     loginSubmit.disabled = false;
   }
 });
+
+// Show "Sign in with Lark" when the server has it set up, and explain a failed Lark sign-in.
+const larkErrors = {
+  denied: 'Lark sign-in was cancelled.',
+  expired: 'The Lark sign-in took too long or was opened in another browser. Please try again.',
+  organisation: 'Your Lark account is not part of this organisation.',
+  failed: 'Lark sign-in failed. Please try again, or sign in with your password.',
+};
+const larkError = larkErrors[new URLSearchParams(window.location.search).get('error')];
+if (larkError) {
+  loginMessage.textContent = larkError;
+  loginMessage.hidden = false;
+}
+fetch('/api/auth/options')
+  .then((response) => (response.ok ? response.json() : {}))
+  .then((options) => {
+    document.getElementById('larkLogin').hidden = !options.lark;
+  })
+  .catch(() => {});
